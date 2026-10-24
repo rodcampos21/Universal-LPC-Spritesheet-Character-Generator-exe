@@ -7,6 +7,7 @@ import json
 import mimetypes
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -46,11 +47,41 @@ class App:
         return catalog.load(self.root())
 
     def status(self) -> dict:
-        return {"art": assets.installed(self.root()), "output_dir": paths.output_dir(),
+        return {"art": assets.installed(self.root()), "output_dir": paths.output_dir(), "art_dir": self.root(),
                 "bodies": [{"id": b, "name": BODY_PT[b]} for b in BODY_TYPES],
                 "anims": [{"id": a, "name": ANIM_PT[a], "row": ANIMS[a][0], "rows": ANIMS[a][1], "frames": ANIMS[a][2],
                           "cycle": CYCLES[a], "fps": FPS.get(a, 8)} for a in ANIMS],
                 "dirs": DIR_PT}
+
+    def set_art_dir(self, chosen: str, move: bool):
+        """Muda o local da arte. Se já estiver baixada e move=True, move a pasta (tarefa em segundo plano)."""
+        new = paths.art_dir_for(chosen)
+        old = self.root()
+        if os.path.abspath(new) == os.path.abspath(old):
+            return {"art_dir": old}
+        if os.path.isdir(new) and os.listdir(new) and not assets.installed(new):
+            raise AppError(f"A pasta “{new}” já existe e tem outros arquivos. Escolha outra.")
+        try:
+            os.makedirs(os.path.dirname(new), exist_ok=True)
+            probe = os.path.join(os.path.dirname(new), ".teste")
+            with open(probe, "w") as fh:
+                fh.write("x")
+            os.remove(probe)
+        except OSError as e:
+            raise AppError(f"Não consigo usar “{chosen}”: {e.strerror or e}") from e
+        if move and assets.installed(old) and not assets.installed(new):
+            def work(progress, cancel):
+                progress(0.1, "Movendo a arte…")
+                shutil.move(old, new)
+                paths.save_config(art_dir=new)
+                self.art_root = None if not self.art_root else new
+                return {"art_dir": new}
+            j = self.jobs.submit("moveart", work, "Movendo a arte…")
+            return {"job": j.id, "art_dir": new}
+        paths.save_config(art_dir=new)
+        if self.art_root:
+            self.art_root = new
+        return {"art_dir": new, "installed": assets.installed(new)}
 
     def output(self, override=None) -> str:
         out = os.path.abspath(str(override or paths.output_dir()))
@@ -211,7 +242,9 @@ def make_handler(app: App, port_getter):
                 return
             if path == "/api/pickfolder":
                 try:
-                    return self._json({"path": uninstall.pick_folder(str(b.get("initial") or paths.output_dir()))})
+                    return self._json({"path": uninstall.pick_folder(
+                        str(b.get("initial") or paths.output_dir()),
+                        str(b.get("title") or "Onde salvar as sprite sheets?"))})
                 except RuntimeError as e:
                     raise AppError(str(e)) from e
             if path == "/api/config":
@@ -221,6 +254,11 @@ def make_handler(app: App, port_getter):
                 out = app.output(out)
                 paths.save_config(output_dir=out)
                 return self._json({"output_dir": out})
+            if path == "/api/artdir":
+                chosen = str(b.get("path") or "").strip()
+                if not chosen:
+                    raise AppError("Escolha uma pasta.")
+                return self._json(app.set_art_dir(chosen, bool(b.get("move", True))))
             if path == "/api/openfolder":
                 p = str(b.get("path") or paths.output_dir())
                 if not os.path.isdir(p):

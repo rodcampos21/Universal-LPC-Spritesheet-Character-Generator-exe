@@ -8,7 +8,7 @@ prontas para o Godot.
 ## Como usar
 
 1. Baixe `LPCSpriteGerador.exe` na página de [Releases](../../releases) e dê dois cliques.
-2. Na primeira vez, clique em **Baixar a arte** (~400 MB, só uma vez; fica em `Documentos`… na pasta `~/LPC Sprite Gerador`).
+2. Na primeira vez, escolha **onde guardar a arte** (o banco de dados do LPC, ~400 MB, baixado uma vez; vira uma subpasta "LPC Arte") e **onde salvar os sprites** que você exportar, e clique em **Baixar a arte**. Os dois locais podem ser mudados depois em **Configurações** (a arte é movida para o novo lugar).
 3. Escolha o corpo, as peças e as cores (a prévia anima andando, correndo, golpeando…).
 4. Em **Salvar**, clique em **Escolher pasta…** (por exemplo, dentro do seu projeto Godot) e em **Salvar sprite sheet**.
 

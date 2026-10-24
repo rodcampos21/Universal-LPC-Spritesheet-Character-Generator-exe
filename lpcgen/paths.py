@@ -12,8 +12,21 @@ def home() -> str:
     return os.path.join(os.path.expanduser("~"), "LPC Sprite Gerador")
 
 
+ART_NAME = "LPC Arte"
+
+
 def art_dir() -> str:
-    return os.path.join(home(), "arte")
+    """Onde fica a arte do LPC (o 'banco de dados'): pasta escolhida + 'LPC Arte'."""
+    env = os.environ.get("LPCGEN_ART")
+    if env:
+        return env
+    return load_config().get("art_dir") or os.path.join(home(), ART_NAME)
+
+
+def art_dir_for(chosen: str) -> str:
+    """Sempre cria uma subpasta própria, para o desinstalador nunca apagar arquivos seus."""
+    chosen = os.path.abspath(chosen)
+    return chosen if os.path.basename(chosen) == ART_NAME else os.path.join(chosen, ART_NAME)
 
 
 def config_path() -> str:

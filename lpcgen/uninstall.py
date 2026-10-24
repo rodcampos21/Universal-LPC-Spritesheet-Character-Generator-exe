@@ -23,7 +23,7 @@ def scan() -> dict:
         items.append({"id": "art", "label": "Arte baixada (sprites do LPC)", "bytes": _size(paths.art_dir())})
     if os.path.isfile(paths.config_path()):
         items.append({"id": "config", "label": "Configurações", "bytes": os.path.getsize(paths.config_path())})
-    return {"home": paths.home(), "output_dir": paths.output_dir(), "items": items}
+    return {"home": paths.home(), "output_dir": paths.output_dir(), "art_dir": paths.art_dir(), "items": items}
 
 
 def _rm(p):
@@ -45,14 +45,16 @@ def run_uninstall() -> dict:
             removed.append(it["label"])
         except OSError as e:
             failed.append(f"{it['label']}: {e}")
+    cfg_art = os.path.basename(paths.art_dir())
     try:
+        os.rmdir(os.path.dirname(paths.art_dir())) if cfg_art == paths.ART_NAME and not os.listdir(os.path.dirname(paths.art_dir())) else None
         os.rmdir(paths.home())
     except OSError:
         pass
     return {"removed": removed, "failed": failed}
 
 
-def pick_folder(initial: str | None = None) -> str | None:
+def pick_folder(initial: str | None = None, title: str = "Onde salvar as sprite sheets?") -> str | None:
     try:
         import tkinter
         from tkinter import filedialog
@@ -65,7 +67,7 @@ def pick_folder(initial: str | None = None) -> str | None:
         try:
             init = initial if initial and os.path.isdir(initial) else os.path.expanduser("~")
             chosen = filedialog.askdirectory(initialdir=init, mustexist=False, parent=root,
-                                             title="Onde salvar as sprite sheets?")
+                                             title=title)
         finally:
             root.destroy()
     except Exception as e:                                         # noqa: BLE001

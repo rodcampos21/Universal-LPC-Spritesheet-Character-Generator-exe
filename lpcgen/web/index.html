@@ -16,6 +16,17 @@
 <section id="setup" class="card hidden">
   <h2>Primeiro uso: baixar a arte</h2>
   <p>O app usa os sprites do <b>Universal LPC Spritesheet Character Generator</b>. Eles são baixados uma vez (cerca de 400 MB) e ficam guardados no seu computador.</p>
+  <h3>Onde guardar a arte (banco de dados do LPC)</h3>
+  <div class="row">
+    <input id="artdir" class="grow" spellcheck="false">
+    <button id="btnPickArt">Escolher pasta…</button>
+  </div>
+  <h3>Onde salvar os sprites que você exportar</h3>
+  <div class="row">
+    <input id="outdir0" class="grow" spellcheck="false">
+    <button id="btnPickOut0">Escolher pasta…</button>
+  </div>
+  <p class="muted">Dá para mudar os dois depois, em Configurações. Será criada uma subpasta “LPC Arte” dentro da pasta escolhida.</p>
   <button id="btnDownload" class="primary">Baixar a arte agora</button>
   <div class="bar hidden" id="dlbar"><div></div></div>
   <p id="dlmsg" class="muted"></p>
@@ -78,6 +89,12 @@
 <dialog id="dlgSettings">
   <h2>Configurações</h2>
   <div id="setinfo"></div>
+  <h3>Local da arte (banco de dados)</h3>
+  <div class="row"><input id="artdir2" class="grow" spellcheck="false"><button id="btnPickArt2">Mudar…</button></div>
+  <p class="muted">Se a arte já estiver baixada, ela é movida para o novo local.</p>
+  <h3>Pasta dos sprites exportados</h3>
+  <div class="row"><input id="outdir2" class="grow" spellcheck="false"><button id="btnPickOut2">Mudar…</button></div>
+  <p id="setmsg2" class="muted"></p>
   <p class="muted">Remover apaga só a arte baixada e as configurações. Os sprites que você gerou ficam onde estão.</p>
   <div class="row">
     <button id="btnUninstall" class="danger">Remover arte e configurações</button>

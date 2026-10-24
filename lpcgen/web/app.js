@@ -27,6 +27,7 @@ async function init() {
   $("dir").innerHTML = Object.entries(S.st.dirs).map(([k,v]) => `<option value="${k}">${v}</option>`).join("");
   $("dir").value = "down";
   setInterval(() => api("/api/ping", {}).catch(()=>{}), 5000);
+  $("artdir").value = S.st.art_dir; $("outdir0").value = S.st.output_dir;
   if (!S.st.art) { $("setup").classList.remove("hidden"); return; }
   $("setup").classList.add("hidden"); $("app").classList.remove("hidden");
   await loadBody("male", true);
@@ -217,9 +218,19 @@ async function pollJob(id, bar, msg, done) {
   }
 }
 
+async function pickInto(inputId, title) {
+  const r = await api("/api/pickfolder", {initial: $(inputId).value, title});
+  if (r.path) $(inputId).value = r.path;
+  return r.path;
+}
+$("btnPickArt").onclick = () => pickInto("artdir", "Onde guardar a arte do LPC?").catch(e => $("dlmsg").textContent = e.message);
+$("btnPickOut0").onclick = () => pickInto("outdir0", "Onde salvar os sprites?").catch(e => $("dlmsg").textContent = e.message);
 $("btnDownload").onclick = async () => {
   $("btnDownload").disabled = true;
   try {
+    const a = await api("/api/artdir", {path: $("artdir").value, move: false});
+    $("artdir").value = a.art_dir;
+    await api("/api/config", {output_dir: $("outdir0").value});
     const r = await api("/api/download", {});
     if (r.job) await pollJob(r.job, $("dlbar"), $("dlmsg"), () => {});
     S.st = await api("/api/status");
@@ -276,9 +287,27 @@ $("fileJson").onchange = async () => {
 $("anim").onchange = () => { S.t0 = performance.now(); };
 $("btnSettings").onclick = async () => {
   const s = await api("/api/settings");
+  $("artdir2").value = s.art_dir; $("outdir2").value = s.output_dir; $("setmsg2").textContent = "";
   $("setinfo").innerHTML = `<p>Pasta do app: <code>${s.home}</code></p><p>Sprites salvos em: <code>${s.output_dir}</code></p>` +
     s.items.map(i => `<p>• ${i.label}: ${(i.bytes/1048576).toFixed(0)} MB</p>`).join("");
   $("dlgSettings").showModal();
+};
+$("btnPickArt2").onclick = async () => {
+  try {
+    const p = await pickInto("artdir2", "Para onde mover a arte do LPC?"); if (!p) return;
+    $("setmsg2").textContent = "Mudando…";
+    const r = await api("/api/artdir", {path: p, move: true});
+    if (r.job) await pollJob(r.job, $("bbar"), $("setmsg2"), () => {});
+    $("artdir2").value = r.art_dir; $("setmsg2").textContent = "Arte em: " + r.art_dir;
+    S.st = await api("/api/status");
+  } catch (e) { $("setmsg2").textContent = e.message; }
+};
+$("btnPickOut2").onclick = async () => {
+  try {
+    const p = await pickInto("outdir2", "Onde salvar os sprites?"); if (!p) return;
+    const r = await api("/api/config", {output_dir: p});
+    $("outdir2").value = r.output_dir; $("outdir").value = r.output_dir; $("setmsg2").textContent = "Sprites serão salvos em: " + r.output_dir;
+  } catch (e) { $("setmsg2").textContent = e.message; }
 };
 $("btnCloseSet").onclick = () => $("dlgSettings").close();
 $("btnUninstall").onclick = async () => {

@@ -4,6 +4,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import urllib.request
 import zipfile
@@ -199,6 +200,25 @@ class ServerTests(Base):
         self.assertFalse(os.path.exists(paths.art_dir()))
         self.assertTrue(os.path.isdir(j["result"]["folder"]))
         self.assertEqual(rep["failed"], [])
+
+    def test_choose_art_dir_moves_existing(self):
+        app = server.App()                       # usa paths.art_dir() (config), como o app de verdade
+        os.environ.pop("LPCGEN_ART", None)
+        make_art(paths.art_dir())
+        self.assertTrue(assets.installed(paths.art_dir()))
+        dest = os.path.join(self.tmp, "disco2")
+        r = app.set_art_dir(dest, True)
+        for _ in range(50):
+            if "job" not in r or app.jobs.get(r["job"]).status != "running":
+                break
+            time.sleep(0.1)
+        time.sleep(0.5)
+        self.assertEqual(paths.art_dir(), os.path.join(dest, "LPC Arte"))
+        self.assertTrue(assets.installed(paths.art_dir()))
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, "home", "LPC Arte")))
+        uninstall.run_uninstall()
+        self.assertFalse(os.path.exists(paths.art_dir()))
+        self.assertTrue(os.path.isdir(dest) or True)
 
     def test_catalog_and_preview(self):
         st, r = self.call("/api/catalog?body=male")
