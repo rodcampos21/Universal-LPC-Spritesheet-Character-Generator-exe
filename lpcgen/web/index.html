@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LPC Sprite Gerador</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <h1>LPC Sprite Gerador <small>visão de cima · Godot</small></h1>
+  <div class="grow"></div>
+  <button id="btnSettings" class="ghost">Configurações</button>
+</header>
+
+<section id="setup" class="card hidden">
+  <h2>Primeiro uso: baixar a arte</h2>
+  <p>O app usa os sprites do <b>Universal LPC Spritesheet Character Generator</b>. Eles são baixados uma vez (cerca de 400 MB) e ficam guardados no seu computador.</p>
+  <button id="btnDownload" class="primary">Baixar a arte agora</button>
+  <div class="bar hidden" id="dlbar"><div></div></div>
+  <p id="dlmsg" class="muted"></p>
+</section>
+
+<main id="app" class="hidden">
+  <aside class="preview card">
+    <div class="row">
+      <label>Corpo <select id="body"></select></label>
+      <button id="btnRandom">🎲 Sortear</button>
+      <button id="btnReset" class="ghost">Limpar</button>
+    </div>
+    <div class="stage"><canvas id="cv" width="256" height="256"></canvas><div id="busy" class="busy hidden">…</div></div>
+    <div class="row">
+      <label>Animação <select id="anim"></select></label>
+      <label>Direção <select id="dir"></select></label>
+      <label>Zoom <select id="zoom"><option>2</option><option selected>3</option><option>4</option></select></label>
+    </div>
+    <p id="warn" class="warn"></p>
+
+    <h3>Salvar</h3>
+    <div class="row">
+      <input id="outdir" class="grow" spellcheck="false" title="Pasta onde as sprite sheets serão salvas">
+      <button id="btnPick">Escolher pasta…</button>
+      <button id="btnOpen" class="ghost">Abrir</button>
+    </div>
+    <div class="row">
+      <input id="name" class="grow" placeholder="Nome do personagem" value="personagem">
+      <button id="btnSave" class="primary">Salvar sprite sheet</button>
+    </div>
+    <div class="row opts">
+      <label><input type="checkbox" id="oAnim" checked> PNG por animação</label>
+      <label><input type="checkbox" id="oGif" checked> GIFs</label>
+      <label><input type="checkbox" id="oGodot" checked> Godot (.tres)</label>
+    </div>
+    <p id="savemsg" class="muted"></p>
+
+    <h3>Lote de NPCs aleatórios</h3>
+    <div class="row">
+      <label>Quantos <input id="bcount" type="number" min="1" max="500" value="20" style="width:70px"></label>
+      <label>Prefixo <input id="bprefix" value="npc" style="width:90px"></label>
+      <button id="btnBatch">Gerar lote</button>
+    </div>
+    <div class="bar hidden" id="bbar"><div></div></div>
+    <p id="bmsg" class="muted"></p>
+
+    <div class="row">
+      <button id="btnLoad" class="ghost">Abrir personagem (.json)</button>
+      <input type="file" id="fileJson" accept=".json" class="hidden">
+    </div>
+  </aside>
+
+  <section class="picker card">
+    <input id="filter" placeholder="Filtrar peças (ex.: cabelo, espada, capuz)…">
+    <details id="shared" open></details>
+    <div id="groups"></div>
+  </section>
+</main>
+
+<dialog id="dlgSettings">
+  <h2>Configurações</h2>
+  <div id="setinfo"></div>
+  <p class="muted">Remover apaga só a arte baixada e as configurações. Os sprites que você gerou ficam onde estão.</p>
+  <div class="row">
+    <button id="btnUninstall" class="danger">Remover arte e configurações</button>
+    <div class="grow"></div>
+    <button id="btnCloseSet">Fechar</button>
+  </div>
+  <p id="setmsg" class="muted"></p>
+</dialog>
+<script src="/static/app.js"></script>
+</body>
+</html>
