@@ -150,6 +150,14 @@ class CelShadeTests(Base):
             self.assertGreater(out.getpixel((32 * sc, 32 * sc))[3], 200)
             self.assertEqual(out.getpixel((2, 2))[3], 0)
 
+    def test_refined_preset(self):
+        im = Image.new("RGBA", (64, 64))
+        im.paste((60, 120, 200, 255), (18, 8, 46, 58))
+        out = celshade.celshade_frame(im, dict(celshade.PRESETS["refined"], ground=True))
+        self.assertEqual(out.size, (256, 256))
+        c = celshade.clean({"style": "x", "rim": 500, "scale": 9})
+        self.assertEqual((c["style"], c["rim"], c["scale"]), ("ink", 100, 3))
+
     def test_epx_does_not_invent_colors(self):
         import numpy as np
         a = np.zeros((6, 6, 4), np.uint8)

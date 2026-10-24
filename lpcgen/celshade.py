@@ -4,7 +4,13 @@ from __future__ import annotations
 import numpy as np
 from PIL import Image, ImageFilter
 
-DEFAULTS = {"scale": 3, "smooth": 60, "outline": 2, "ink": True, "bands": 0, "saturation": 110}
+DEFAULTS = {"scale": 3, "smooth": 60, "outline": 2, "ink": True, "bands": 0, "saturation": 110,
+            "style": "ink", "rim": 0, "shift": 0, "soft": 0, "ground": False}
+PRESETS = {
+    "cel": {},
+    "refined": {"scale": 4, "smooth": 70, "outline": 2, "ink": False, "bands": 0, "saturation": 120,
+                "style": "tint", "rim": 55, "shift": 60, "soft": 40, "ground": False},
+}
 OUTLINE_PX = {0: 0, 1: 1, 2: 2, 3: 3}                      # nenhum / fino / médio / grosso (em px do HD, × escala/3)
 
 
@@ -19,6 +25,10 @@ def clean(params: dict | None) -> dict:
     p["bands"] = 0 if int(p["bands"]) < 2 else min(8, int(p["bands"]))
     p["saturation"] = max(50, min(200, int(p["saturation"])))
     p["ink"] = bool(p["ink"])
+    p["style"] = "tint" if p["style"] == "tint" else "ink"
+    for k in ("rim", "shift", "soft"):
+        p[k] = max(0, min(100, int(p[k])))
+    p["ground"] = bool(p["ground"])
     return p
 
 
@@ -84,6 +94,31 @@ def celshade_frame(im: Image.Image, params: dict | None = None) -> Image.Image:
     # contraste/saturação
     lum = (col * np.array([0.299, 0.587, 0.114], np.float32)).sum(axis=-1, keepdims=True)
     col = np.clip(lum + (col - lum) * (p["saturation"] / 100), 0, 255)
+    wlum = np.array([0.299, 0.587, 0.114], np.float32)
+    inside = (al > 0.5)
+    if p["soft"]:                                   # gradiente suave dentro de áreas parecidas (sombra macia)
+        lum0 = (col * wlum).sum(axis=-1)
+        gy0, gx0 = np.gradient(lum0)
+        edge = np.clip(np.hypot(gx0, gy0) / 14.0, 0, 1)
+        sig = max(1.0, s * 0.9)
+        blur = np.array(Image.fromarray(col.astype(np.uint8)).filter(ImageFilter.GaussianBlur(sig))).astype(np.float32)
+        wsoft = (1 - edge)[..., None] * (p["soft"] / 100)
+        col = col * (1 - wsoft) + blur * wsoft
+    if p["shift"]:                                  # sombras frias (azul/roxo), luzes quentes
+        lum1 = (col * wlum).sum(axis=-1)
+        loc = np.array(Image.fromarray(np.clip(lum1, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(s * 3))).astype(np.float32)
+        d = np.clip((lum1 - loc) / 40.0, -1, 1)[..., None]
+        k = p["shift"] / 100
+        col = col + k * (np.clip(-d, 0, 1) * np.array([-16, -6, 24], np.float32) + np.clip(d, 0, 1) * np.array([24, 14, -16], np.float32))
+        col = np.clip(col, 0, 255)
+    if p["rim"]:                                    # brilho de borda (luz vindo do alto-esquerda)
+        am = np.array(Image.fromarray((al * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(max(1.0, s * 1.2)))).astype(np.float32) / 255
+        gy, gx = np.gradient(am)
+        mag = np.hypot(gx, gy) + 1e-6
+        facing = np.clip((gx + gy) / (np.sqrt(2) * mag), 0, 1)          # normal externa = -grad; luz em (-1,-1)
+        near = np.clip(mag * (6.0 / max(1, s * 0.5)), 0, 1)
+        wr = (facing * near * inside)[..., None] * (p["rim"] / 100)
+        col = np.clip(col + wr * (255 - col) * 0.55 * np.array([1.0, 0.92, 0.75], np.float32), 0, 255)
     # bandas de sombra (cel shade): poucos níveis de brilho, mantendo o matiz
     if p["bands"]:
         lum = (col * np.array([0.299, 0.587, 0.114], np.float32)).sum(axis=-1, keepdims=True)
@@ -108,9 +143,24 @@ def celshade_frame(im: Image.Image, params: dict | None = None) -> Image.Image:
         ring = np.array(dil).astype(np.int16) - np.array(mask).astype(np.int16)
         ring = np.clip(ring, 0, 255).astype(np.uint8)
         # cor da tinta: tom bem escuro do próprio sprite (fica mais bonito que preto puro)
-        ink = Image.new("RGBA", res.size, (22, 14, 26, 0))
+        if p["style"] == "tint" and p["smooth"] > 0:
+            dark = np.clip(col * 0.36 + np.array([6, 2, 16], np.float32), 0, 255).astype(np.uint8)
+            ink = Image.fromarray(np.dstack([dark, np.zeros(dark.shape[:2], np.uint8)]), "RGBA")
+        else:
+            ink = Image.new("RGBA", res.size, (22, 14, 26, 0))
         ink.putalpha(Image.fromarray(ring).filter(ImageFilter.GaussianBlur(0.6)))
         res = Image.alpha_composite(ink, res)
+    if p["ground"]:                                 # sombra suave no chão, atrás dos pés
+        bb = res.getchannel("A").getbbox()
+        if bb:
+            sh = Image.new("RGBA", res.size, (0, 0, 0, 0))
+            cx, by = (bb[0] + bb[2]) / 2, bb[3]
+            wd, ht = (bb[2] - bb[0]) * 0.42, 3.2 * s
+            ell = Image.new("L", res.size, 0)
+            from PIL import ImageDraw
+            ImageDraw.Draw(ell).ellipse((cx - wd, by - ht * 1.2, cx + wd, by + ht * 0.8), fill=95)
+            sh.putalpha(ell.filter(ImageFilter.GaussianBlur(s * 1.2)))
+            res = Image.alpha_composite(sh, res)
     crop = (pad * s, pad * s, (pad + w) * s, (pad + h) * s)
     return res.crop(crop)
 

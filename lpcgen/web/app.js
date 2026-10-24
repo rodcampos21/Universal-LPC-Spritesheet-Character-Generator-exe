@@ -19,6 +19,7 @@ async function api(path, body) {
 const label = (t) => TYPE_PT[t] || t.replace(/_/g, " ");
 
 async function init() {
+  ["hdPrev", ...Object.values(HD_IDS)].forEach(id => { $(id).onchange = () => { if (id !== "hdPrev") $("hdPreset").value = "custom"; requestHd(); }; });
   S.st = await api("/api/status");
   $("outdir").value = S.st.output_dir;
   $("body").innerHTML = S.st.bodies.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
@@ -200,7 +201,6 @@ function requestHd() {
     } catch (e) { $("warn").textContent = e.message; }
   }, 250);
 }
-["hdPrev","hdScale","hdOutline","hdSmooth","hdSat","hdBands","hdInk"].forEach(id => { $(id).onchange = requestHd; });
 $("anim").addEventListener("change", requestHd);
 
 function tick(now) {
@@ -289,8 +289,21 @@ async function saveDir() {
 }
 $("outdir").onchange = saveDir;
 $("btnOpen").onclick = () => api("/api/openfolder", {path: $("outdir").value}).catch(e => $("savemsg").textContent = e.message);
-const hdParams = () => ({scale: +$("hdScale").value, outline: +$("hdOutline").value, smooth: +$("hdSmooth").value,
-  saturation: +$("hdSat").value, bands: +$("hdBands").value, ink: $("hdInk").checked});
+const HD_PRESETS = {
+  cel: {scale: 3, outline: 2, smooth: 60, saturation: 110, bands: 0, ink: true, style: "ink", rim: 0, shift: 0, soft: 0, ground: false},
+  refined: {scale: 4, outline: 2, smooth: 70, saturation: 120, bands: 0, ink: false, style: "tint", rim: 55, shift: 60, soft: 40, ground: false}};
+const HD_IDS = {scale: "hdScale", outline: "hdOutline", smooth: "hdSmooth", saturation: "hdSat", bands: "hdBands", ink: "hdInk",
+  style: "hdStyle", rim: "hdRim", shift: "hdShift", soft: "hdSoft", ground: "hdGround"};
+const hdParams = () => {
+  const o = {};
+  for (const [k, id] of Object.entries(HD_IDS)) { const e = $(id); o[k] = e.type === "checkbox" ? e.checked : (e.tagName === "SELECT" && k === "style" ? e.value : +e.value); }
+  return o;
+};
+$("hdPreset").onchange = () => {
+  const pr = HD_PRESETS[$("hdPreset").value]; if (!pr) return;
+  for (const [k, id] of Object.entries(HD_IDS)) { const e = $(id); if (e.type === "checkbox") e.checked = pr[k]; else e.value = pr[k]; }
+  requestHd();
+};
 const opts = () => ({per_anim: $("oAnim").checked, gifs: $("oGif").checked, godot: $("oGodot").checked,
   hd: $("oHd").checked ? hdParams() : null});
 $("btnSave").onclick = async () => {

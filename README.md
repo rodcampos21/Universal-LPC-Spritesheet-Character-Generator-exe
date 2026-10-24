@@ -23,6 +23,19 @@ cores), suavização e contorno. Marque **Ver prévia HD** para ver animado e **
 `<nome>_hd.png`, as folhas extras `_hd` e o `<nome>_hd.tres` (com os quadros já na escala certa). Os arquivos originais
 não mudam. Em quadros muito pequenos o contorno pode "engolir" detalhes finos (olhos); ajuste Suavizar/Contorno.
 
+## Versão HD (experimental)
+
+Efeito automático (sem IA) que amplia a pixel art em 2×, 3× ou 4× e deixa o visual mais "refinado". Dois estilos:
+
+- **Refinado (suave, colorido):** bordas redondas, gradientes suaves, sombras frias e luzes quentes, brilho de borda,
+  contorno colorido (tom escuro da própria cor), cores mais vivas e sombra opcional no chão. É o mais próximo de
+  artes "HD pixel art".
+- **Cel shade:** contorno de tinta escura e linhas internas, visual de desenho animado.
+
+Marque **Ver prévia HD** para ver animado e **Salvar também a versão HD** para gerar `<nome>_hd.png`, as folhas extras
+`_hd` e o `<nome>_hd.tres` (com os quadros já na escala certa). Os originais não mudam. É um filtro: não redesenha
+o personagem nem cria detalhes novos, e o gradiente pode suavizar detalhes minúsculos (olhos); ajuste os controles.
+
 ## Skin a partir de uma imagem (experimental)
 
 Sobe uma imagem de personagem (corpo inteiro, de frente, fundo liso/transparente). O app sugere as cores de **pele, cabelo,

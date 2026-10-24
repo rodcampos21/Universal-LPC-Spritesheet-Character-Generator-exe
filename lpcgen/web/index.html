@@ -67,15 +67,27 @@
     <h3>Versão HD (cel shade) <span class="tag">experimental</span></h3>
     <p class="muted">Amplia a pixel art com bordas suaves e contorno de tinta. Gera arquivos <code>_hd</code> separados; os originais não mudam.</p>
     <div class="row">
-      <label><input type="checkbox" id="hdPrev"> Ver prévia HD</label>
-      <label>Escala <select id="hdScale"><option value="2">2×</option><option value="3" selected>3×</option><option value="4">4×</option></select></label>
-      <label>Contorno <select id="hdOutline"><option value="0">nenhum</option><option value="1">fino</option><option value="2" selected>médio</option><option value="3">grosso</option></select></label>
+      <label>Estilo <select id="hdPreset"><option value="cel">Cel shade (contorno forte)</option><option value="refined" selected>Refinado (suave, colorido)</option><option value="custom">Personalizado</option></select></label>
     </div>
     <div class="row">
-      <label>Suavizar <input type="range" id="hdSmooth" min="0" max="100" value="60"></label>
-      <label>Cores <input type="range" id="hdSat" min="70" max="160" value="110"></label>
+      <label><input type="checkbox" id="hdPrev"> Ver prévia HD</label>
+      <label>Escala <select id="hdScale"><option value="2">2×</option><option value="3">3×</option><option value="4" selected>4×</option></select></label>
+      <label>Espessura <select id="hdOutline"><option value="0">nenhum</option><option value="1">fino</option><option value="2" selected>médio</option><option value="3">grosso</option></select></label>
+    </div>
+    <div class="row">
+      <label>Suavizar <input type="range" id="hdSmooth" min="0" max="100" value="70"></label>
+      <label>Cores <input type="range" id="hdSat" min="70" max="160" value="120"></label>
       <label>Bandas <select id="hdBands"><option value="0" selected>do LPC</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
-      <label><input type="checkbox" id="hdInk" checked> Linhas internas</label>
+      <label><input type="checkbox" id="hdInk"> Linhas internas</label>
+    </div>
+    <div class="row">
+      <label>Contorno <select id="hdStyle"><option value="ink">tinta escura</option><option value="tint" selected>colorido</option></select></label>
+      <label>Brilho de borda <input type="range" id="hdRim" min="0" max="100" value="55"></label>
+      <label>Sombras coloridas <input type="range" id="hdShift" min="0" max="100" value="60"></label>
+    </div>
+    <div class="row">
+      <label>Gradiente <input type="range" id="hdSoft" min="0" max="100" value="40"></label>
+      <label><input type="checkbox" id="hdGround"> Sombra no chão</label>
     </div>
     <div class="row"><label><input type="checkbox" id="oHd"> Salvar também a versão HD</label></div>
 
