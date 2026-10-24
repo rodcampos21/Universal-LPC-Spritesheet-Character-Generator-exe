@@ -64,6 +64,22 @@
     </div>
     <p id="savemsg" class="muted"></p>
 
+    <h3>Analisar quadros (sem tremida)</h3>
+    <p class="muted">Recorta os quadros sem perder a posição, inclusive os de arma grande (oversize), e gera um .tres do Godot.</p>
+    <div class="row">
+      <label>Modo <select id="amode">
+        <option value="compact">Compacto (recomendado)</option>
+        <option value="fixed">Caixa fixa (mesmo tamanho em tudo)</option></select></label>
+      <label><input type="checkbox" id="aloose"> PNG de cada quadro</label>
+    </div>
+    <div class="row">
+      <button id="btnAnalyze">Analisar este personagem</button>
+      <button id="btnAnalyzePng" class="ghost">Analisar um PNG…</button>
+      <label>Quadro <select id="afs"><option value="0">auto</option><option>64</option><option>128</option><option>192</option></select></label>
+      <input type="file" id="filePng" accept="image/png" class="hidden">
+    </div>
+    <div id="areport" class="muted"></div>
+
     <h3>Lote de NPCs aleatórios</h3>
     <div class="row">
       <label>Quantos <input id="bcount" type="number" min="1" max="500" value="20" style="width:70px"></label>

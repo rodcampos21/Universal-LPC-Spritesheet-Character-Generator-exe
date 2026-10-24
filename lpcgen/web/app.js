@@ -273,6 +273,28 @@ $("btnBatch").onclick = async () => {
     await pollJob(r.job, $("bbar"), $("bmsg"), (res) => { $("bmsg").textContent = `${res.count} personagens salvos em: ${res.folder}`; });
   } catch (e) { $("bmsg").textContent = "Erro: " + e.message; }
 };
+function showReport(r) {
+  $("areport").innerHTML = `<p>Salvo em: ${r.folder}</p><table><tr><th>Animação</th><th>Quadros</th><th>Original</th><th>Caixa</th><th>Economia</th></tr>` +
+    r.report.map(x => `<tr><td>${x.anim}</td><td>${x.dirs}×${x.frames}</td><td>${x.original}px</td><td>${x.cell[0]}×${x.cell[1]}</td><td>${x.saved_pct}%</td></tr>`).join("") + "</table>";
+}
+const aopts = () => ({mode: $("amode").value, loose: $("aloose").checked, output_dir: $("outdir").value});
+$("btnAnalyze").onclick = async () => {
+  $("areport").textContent = "Analisando…";
+  if (!(await saveDir())) return;
+  try { showReport(await api("/api/analyze", {character: character(), name: $("name").value, ...aopts()})); }
+  catch (e) { $("areport").textContent = "Erro: " + e.message; }
+};
+$("btnAnalyzePng").onclick = () => $("filePng").click();
+$("filePng").onchange = async () => {
+  const f = $("filePng").files[0]; if (!f) return;
+  $("areport").textContent = "Analisando…";
+  try {
+    const b64 = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(f); });
+    if (!(await saveDir())) return;
+    showReport(await api("/api/analyze_png", {png: b64, frame_size: +$("afs").value, name: f.name.replace(/\.png$/i, ""), ...aopts()}));
+  } catch (e) { $("areport").textContent = "Erro: " + e.message; }
+  $("filePng").value = "";
+};
 $("btnLoad").onclick = () => $("fileJson").click();
 $("fileJson").onchange = async () => {
   const f = $("fileJson").files[0]; if (!f) return;

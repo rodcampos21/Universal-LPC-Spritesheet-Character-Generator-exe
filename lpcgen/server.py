@@ -15,7 +15,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import assets, catalog, export, paths, randomize, render, uninstall
+from . import analyze, assets, catalog, export, paths, randomize, render, uninstall
 from .constants import ANIM_PT, ANIMS, BODY_PT, BODY_TYPES, CYCLES, DIR_PT, FPS
 from .jobs import JobManager
 
@@ -23,7 +23,7 @@ if getattr(sys, "frozen", False):
     WEB = os.path.join(sys._MEIPASS, "lpcgen", "web")          # type: ignore[attr-defined]
 else:
     WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
-MAX_BODY = 8 * 1024 * 1024
+MAX_BODY = 40 * 1024 * 1024
 
 
 class AppError(Exception):
@@ -121,6 +121,33 @@ class App:
         root = self.output(out)
         with self.lock:
             return export.save_character(cat, character, root, name, opts)
+
+    def analyze_character(self, b: dict) -> dict:
+        cat = self.cat()
+        root = self.output(b.get("output_dir"))
+        mode = "fixed" if b.get("mode") == "fixed" else "compact"
+        with self.lock:
+            return analyze.analyze_character(cat, b.get("character") or {}, root, str(b.get("name") or "personagem"),
+                                             mode, bool(b.get("loose")))
+
+    def analyze_png(self, b: dict) -> dict:
+        from PIL import Image
+        root = self.output(b.get("output_dir"))
+        mode = "fixed" if b.get("mode") == "fixed" else "compact"
+        try:
+            raw = base64.b64decode(str(b.get("png", "")).split(",", 1)[-1])
+            im = Image.open(io.BytesIO(raw))
+            im.load()
+        except Exception as e:                                           # noqa: BLE001
+            raise AppError("Não consegui abrir essa imagem (use PNG).") from e
+        try:
+            anims = analyze.from_png(im, int(b.get("frame_size") or 0), export.slug(str(b.get("name") or "animacao")))
+        except ValueError as e:
+            raise AppError(str(e)) from e
+        if not anims:
+            raise AppError("Não encontrei nenhum quadro desenhado nessa imagem.")
+        return analyze.export_analysis(anims, root, str(b.get("name") or "animacao"), mode, bool(b.get("loose")),
+                                       "png")
 
     def batch(self, b: dict, progress, cancel) -> dict:
         cat = self.cat()
@@ -289,6 +316,10 @@ def make_handler(app: App, port_getter):
                 r = app.save(b.get("character") or {}, str(b.get("name") or "personagem"),
                              b.get("options") or {}, b.get("output_dir"))
                 return self._json(r)
+            if path == "/api/analyze":
+                return self._json(app.analyze_character(b))
+            if path == "/api/analyze_png":
+                return self._json(app.analyze_png(b))
             if path == "/api/batch":
                 j = app.jobs.submit("batch", lambda prog, cancel: app.batch(b, prog, cancel), "Gerando…")
                 return self._json({"job": j.id})

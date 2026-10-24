@@ -15,6 +15,18 @@ prontas para o Godot.
 Também tem **🎲 Sortear** e **Lote de NPCs aleatórios** (ex.: 50 NPCs de uma vez), e **Abrir personagem (.json)** para
 continuar um personagem salvo.
 
+## Analisar quadros (sem tremida)
+
+Função parecida com o *LPC Frames Analyzer*, feita do zero (o `.exe` original não foi usado nem copiado). Ela recorta os
+quadros **sem perder a posição**, para a animação não tremer quando o tamanho do quadro muda (como nos golpes de espada):
+
+- **Compacto (recomendado):** cada quadro é recortado no menor retângulo e empacotado; o `.tres` usa a `margin` do
+  `AtlasTexture`, então o Godot devolve cada quadro ao tamanho e posição originais, sem ajuste no jogo.
+- **Caixa fixa:** todos os quadros (inclusive os oversize) viram a mesma caixa, centrada no centro original.
+- Funciona com o personagem atual ou com **qualquer PNG** (folha padrão 832×3456 ou uma animação de 64/128/192 px).
+- Salva em `<nome>_frames/`: um PNG por animação, `<nome>_analise.json` (caixas e deslocamentos de cada quadro),
+  `<nome>_frames.tres` e, se marcado, os quadros soltos.
+
 ## O que é salvo (em `<pasta escolhida>/<nome>/`)
 
 | Arquivo | Para quê |

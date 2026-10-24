@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np                                                  # noqa: E402
 from PIL import Image                                               # noqa: E402
 
-from lpcgen import assets, catalog, export, paths, randomize, render, server, uninstall   # noqa: E402
+from lpcgen import analyze, assets, catalog, export, paths, randomize, render, server, uninstall   # noqa: E402
 
 SRC = ["#000001", "#101010", "#202020", "#303030", "#404040", "#505050"]
 RED = ["#110000", "#330000", "#550000", "#770000", "#990000", "#bb0000"]
@@ -136,6 +136,66 @@ class CoreTests(Base):
         self.assertTrue(os.path.isfile(os.path.join(root, "spritesheets/x/y.png")))
         self.assertFalse(os.path.exists(os.path.join(root, "tests")))
         self.assertTrue(os.path.isfile(os.path.join(root, ".ok")))
+
+
+class AnalyzeTests(Base):
+    def _anims(self):
+        import random
+        rng = random.Random(3)
+        frames = []
+        for r in range(4):
+            row = []
+            for c in range(5):
+                im = Image.new("RGBA", (192, 192))
+                x, y = rng.randint(40, 100), rng.randint(30, 100)
+                im.paste((200, 50, 50, 255), (x, y, x + rng.randint(5, 60), y + rng.randint(5, 60)))
+                row.append(im)
+            frames.append(row)
+        small = [[Image.new("RGBA", (64, 64), (0, 0, 0, 0)) for _ in range(3)] for _ in range(4)]
+        for row in small:
+            for im in row:
+                im.paste((0, 0, 255, 255), (20, 10, 40, 60))
+        return [analyze.AnimData("slash_oversize", 192, list(analyze.DIRECTIONS), frames),
+                analyze.AnimData("idle", 64, list(analyze.DIRECTIONS), small)]
+
+    def test_compact_reconstructs_original_cells(self):
+        anims = self._anims()
+        r = analyze.export_analysis(anims, self.tmp, "t", "compact", loose=True)
+        data = json.load(open(os.path.join(r["folder"], "t_analise.json")))
+        for a in anims:
+            sheet = Image.open(os.path.join(r["folder"], f"t_{a.name}.png")).convert("RGBA")
+            for ri, d in enumerate(a.dirs):
+                for ci, fr in enumerate(a.frames[ri]):
+                    f = data["animations"][a.name]["dirs"][d][ci]
+                    x, y, w, h = f["region"]
+                    mx, my = f["margin"][0], f["margin"][1]
+                    cell = Image.new("RGBA", (a.fs, a.fs))
+                    cell.paste(sheet.crop((x, y, x + w, y + h)), (mx, my))
+                    self.assertEqual(cell.tobytes(), fr.tobytes(), (a.name, d, ci))
+        self.assertIn("margin = Rect2(", open(os.path.join(r["folder"], "t_frames.tres")).read())
+        self.assertTrue(os.path.isfile(os.path.join(r["folder"], "soltos", "idle", "down_01.png")))
+
+    def test_fixed_box_is_same_for_all_and_centered(self):
+        anims = self._anims()
+        r = analyze.export_analysis(anims, self.tmp, "f", "fixed")
+        sizes = {tuple(v["cell"]) for v in json.load(open(os.path.join(r["folder"], "f_analise.json")))["animations"].values()}
+        self.assertEqual(len(sizes), 1)
+        w, h = sizes.pop()
+        half = (w // 2, h // 2)
+        a = anims[1]
+        sheet = Image.open(os.path.join(r["folder"], "f_idle.png")).convert("RGBA")
+        cell = Image.new("RGBA", (64, 64))
+        cell.paste(sheet.crop((0, 0, w, h)), (32 - half[0], 32 - half[1]))
+        self.assertEqual(cell.tobytes(), a.frames[0][0].tobytes())
+
+    def test_from_png_detects_oversize(self):
+        im = Image.new("RGBA", (192 * 6, 768))
+        im.paste((255, 0, 0, 255), (90, 90, 100, 100))
+        im.paste((255, 0, 0, 255), (192 * 5 + 90, 90, 192 * 5 + 100, 100))
+        an = analyze.from_png(im, 0, "x")
+        self.assertEqual((an[0].fs, an[0].ncols, len(an[0].dirs)), (192, 6, 4))
+        with self.assertRaises(ValueError):
+            analyze.from_png(Image.new("RGBA", (100, 100)), 64)
 
 
 class ServerTests(Base):
