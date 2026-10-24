@@ -15,7 +15,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import analyze, assets, catalog, export, paths, randomize, render, uninstall
+from . import analyze, assets, catalog, skin, export, paths, randomize, render, uninstall
 from .constants import ANIM_PT, ANIMS, BODY_PT, BODY_TYPES, CYCLES, DIR_PT, FPS
 from .jobs import JobManager
 
@@ -329,6 +329,17 @@ def make_handler(app: App, port_getter):
                 return self._json(r)
             if path == "/api/analyze":
                 return self._json(app.analyze_character(b))
+            if path == "/api/skin/colors":
+                from PIL import Image
+                try:
+                    im = Image.open(io.BytesIO(base64.b64decode(str(b.get("png", "")).split(",", 1)[-1])))
+                    im.load()
+                except Exception as e:                                       # noqa: BLE001
+                    raise AppError("Não consegui abrir essa imagem.") from e
+                try:
+                    return self._json(skin.extract(im))
+                except ValueError as e:
+                    raise AppError(str(e)) from e
             if path == "/api/analyze_dir":
                 return self._json(app.analyze_dir(b))
             if path == "/api/analyze_png":

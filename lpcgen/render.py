@@ -36,19 +36,52 @@ def _load(path: str) -> np.ndarray | None:
     return a
 
 
-def recolor(arr: np.ndarray, mapping: list[tuple[list[str], list[str]]]) -> np.ndarray:
-    """Troca cores exatas (tolerância 1) da paleta de origem para a de destino, índice a índice."""
+def pattern_mask(kind: str, h: int, w: int, scale: int, fs: int = 64) -> np.ndarray:
+    """Máscara (True = segunda cor) em coordenadas locais da célula 64×64, para o padrão acompanhar o quadro."""
+    s = max(1, int(scale))
+    yy, xx = np.mgrid[0:h, 0:w]
+    off = (fs - FRAME) // 2
+    lx, ly = (xx % fs) - off, (yy % fs) - off
+    if kind == "stripes":
+        return (ly // s) % 2 == 1
+    if kind == "vstripes":
+        return (lx // s) % 2 == 1
+    if kind == "diagonal":
+        return ((lx + ly) // s) % 2 == 1
+    if kind == "checker":
+        return ((lx // s) + (ly // s)) % 2 == 1
+    if kind == "dots":
+        return ((lx % (2 * s)) - s) ** 2 + ((ly % (2 * s)) - s) ** 2 <= (0.7 * s) ** 2
+    if kind == "camo":
+        a, b = lx // s, ly // s
+        n = ((a * 73856093) ^ (b * 19349663) ^ ((a // 2) * 83492791) ^ ((b // 2) * 2654435761)) & 0xFFFF
+        return n % 100 < 42
+    return np.zeros((h, w), bool)
+
+
+def recolor(arr: np.ndarray, mapping: list, fs: int = 64) -> np.ndarray:
+    """Troca cores exatas (tolerância 1) da paleta de origem para a de destino, índice a índice.
+    Entrada do mapa: (origem, destino) ou (origem, destino, (tipo_padrao, destino2, escala))."""
     if not mapping:
         return arr
     out = arr.copy()
     rgb = arr[..., :3].astype(np.int16)
     solid = arr[..., 3] > 0
-    for src, dst in mapping:
-        for s, d in zip(src, dst):
+    for entry in mapping:
+        src, dst = entry[0], entry[1]
+        pat = entry[2] if len(entry) > 2 else None
+        mask2 = pattern_mask(pat[0], arr.shape[0], arr.shape[1], pat[2], fs) if pat else None
+        for i, (s, d) in enumerate(zip(src, dst)):
             sr = np.array(_hex(s), dtype=np.int16)
             m = solid & (np.abs(rgb - sr).max(axis=-1) <= 1)
-            if m.any():
+            if not m.any():
+                continue
+            if mask2 is None:
                 out[m, 0:3] = _hex(d)
+            else:
+                d2 = pat[1][i]
+                out[m & ~mask2, 0:3] = _hex(d)
+                out[m & mask2, 0:3] = _hex(d2)
     return out
 
 
@@ -76,7 +109,12 @@ def color_mapping(cat: Catalog, it: Item, s: dict, body_sel: dict | None, shared
             continue
         src, dst = cat.source_colors(slot), cat.target_colors(slot, name)
         if src and dst:
-            mapping.append((src, dst))
+            pat = s.get("pattern") if slot["key"] == "color_1" and not slot.get("shared") else None
+            if isinstance(pat, dict) and pat.get("kind"):
+                dst2 = cat.target_colors(slot, str(pat.get("color2") or "")) or dst
+                mapping.append((src, dst, (str(pat["kind"]), dst2, int(pat.get("scale") or 4))))
+            else:
+                mapping.append((src, dst))
     return mapping
 
 
@@ -240,7 +278,7 @@ def render_custom(cat: Catalog, character: dict, name: str) -> Image.Image:
         arr = _load(p)
         if arr is None:
             continue
-        im = Image.fromarray(recolor(arr, mapping))
+        im = Image.fromarray(recolor(arr, mapping, fs if kind == "custom" else 64))
         if kind == "custom" and not d["single"]:
             canvas.alpha_composite(im, (0, 0))
             continue

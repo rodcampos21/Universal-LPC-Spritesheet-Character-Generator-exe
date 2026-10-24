@@ -34,3 +34,5 @@ dialog{background:var(--card);color:var(--fg);border:1px solid var(--line);borde
 @media (max-width:900px){main{grid-template-columns:1fr}.preview{position:static}}
 
 table{border-collapse:collapse;width:100%;font-size:12px}th,td{border-bottom:1px solid var(--line);padding:3px 6px;text-align:left}
+.tag{background:#e5a93d;color:#222;border-radius:4px;padding:1px 6px;font-size:11px;text-transform:none;letter-spacing:0;vertical-align:middle}
+input[type=color]{padding:0;width:34px;height:28px}

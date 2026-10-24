@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np                                                  # noqa: E402
 from PIL import Image                                               # noqa: E402
 
-from lpcgen import analyze, assets, catalog, export, paths, randomize, render, server, uninstall   # noqa: E402
+from lpcgen import analyze, assets, colorramp, skin, catalog, export, paths, randomize, render, server, uninstall   # noqa: E402
 
 SRC = ["#000001", "#101010", "#202020", "#303030", "#404040", "#505050"]
 RED = ["#110000", "#330000", "#550000", "#770000", "#990000", "#bb0000"]
@@ -136,6 +136,41 @@ class CoreTests(Base):
         self.assertTrue(os.path.isfile(os.path.join(root, "spritesheets/x/y.png")))
         self.assertFalse(os.path.exists(os.path.join(root, "tests")))
         self.assertTrue(os.path.isfile(os.path.join(root, ".ok")))
+
+
+class SkinTests(Base):
+    def test_ramp_has_six_ordered_tones(self):
+        r = colorramp.ramp("#3366cc")
+        self.assertEqual(len(r), 6)
+        lum = [sum(colorramp.parse(c)) for c in r]
+        self.assertEqual(lum, sorted(lum))
+        self.assertIsNone(colorramp.ramp("azul"))
+
+    def test_custom_hex_recolor_and_pattern(self):
+        ch = {"bodyType": "male", "selections": {"hair": {"itemId": "hair_a", "recolor": "#3366cc"}}}
+        sheet, _ = render.render_sheet(self.cat, ch)
+        want = tuple(int(colorramp.ramp("#3366cc")[3][i:i + 2], 16) for i in (1, 3, 5))
+        self.assertEqual(sheet.getpixel((10, 8 * 64 + 10))[:3], want)
+        ch["selections"]["hair"]["pattern"] = {"kind": "stripes", "color2": "#ffffff", "scale": 2}
+        sheet, _ = render.render_sheet(self.cat, ch)
+        cols = {sheet.getpixel((10, 8 * 64 + y))[:3] for y in range(8, 20)}
+        self.assertEqual(len(cols), 2)                        # duas cores alternando
+
+    def test_extract_finds_regions(self):
+        im = Image.new("RGBA", (100, 300), (0, 0, 0, 0))
+        im.paste((230, 180, 140, 255), (35, 10, 65, 50))          # rosto
+        im.paste((60, 40, 20, 255), (30, 0, 70, 12))               # cabelo
+        im.paste((200, 30, 30, 255), (25, 60, 75, 140))            # camisa
+        im.paste((30, 60, 200, 255), (30, 150, 70, 250))           # calça
+        im.paste((90, 90, 90, 255), (28, 255, 72, 295))            # sapatos
+        r = skin.extract(im)["suggest"]
+        near = lambda a, b: sum(abs(x - y) for x, y in zip(colorramp.parse(a), b)) < 90   # noqa: E731
+        self.assertTrue(near(r["skin"], (230, 180, 140)), r)
+        self.assertTrue(near(r["hair"], (60, 40, 20)), r)
+        self.assertTrue(near(r["shirt"], (200, 30, 30)), r)
+        self.assertTrue(near(r["pants"], (30, 60, 200)), r)
+        with self.assertRaises(ValueError):
+            skin.extract(Image.new("RGBA", (50, 50), (255, 255, 255, 255)))
 
 
 class AnalyzeTests(Base):

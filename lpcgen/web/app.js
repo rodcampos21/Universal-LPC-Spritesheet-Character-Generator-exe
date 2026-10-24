@@ -105,10 +105,16 @@ function slotRow(t, q) {
         if (it.match_body && t.type !== "body" && sl.material === "body") return;
         const cs = document.createElement("select");
         cs.title = sl.label;
-        cs.innerHTML = sl.colors.map(x => `<option ${colorOf(c, sl.key) === x ? "selected" : ""}>${x}</option>`).join("");
-        const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = sl.preview[cs.value] || "#888";
-        cs.onchange = () => { setColor(c, it, sl.key, cs.value); sw.style.background = sl.preview[cs.value] || "#888"; refresh(); };
-        sub.append(sw, cs);
+        const curc = colorOf(c, sl.key);
+        cs.innerHTML = (curc.startsWith("#") ? `<option selected>${curc}</option>` : "") +
+          sl.colors.map(x => `<option ${curc === x ? "selected" : ""}>${x}</option>`).join("");
+        const swc = (v) => v.startsWith("#") ? v : (sl.preview[v] || "#888");
+        const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = swc(cs.value);
+        cs.onchange = () => { setColor(c, it, sl.key, cs.value); sw.style.background = swc(cs.value); refresh(); };
+        const pick = document.createElement("input"); pick.type = "color"; pick.title = "Cor livre";
+        pick.value = curc.startsWith("#") && curc.length === 7 ? curc : "#888888";
+        pick.onchange = () => { setColor(c, it, sl.key, pick.value); buildPicker(); refresh(); };
+        sub.append(sw, cs, pick);
       });
     } else if (it.match_body && t.type !== "body" && !own.length) {
       sub.innerHTML = `<span class="muted">cor da pele</span>`;
@@ -305,6 +311,46 @@ $("filePng").onchange = async () => {
     showReport(await api("/api/analyze_png", {png: b64, frame_size: +$("afs").value, name: f.name.replace(/\.png$/i, ""), ...aopts()}));
   } catch (e) { $("areport").textContent = "Erro: " + e.message; }
   $("filePng").value = "";
+};
+// --- Skin a partir de imagem (experimental) ---
+const SKIN_ROWS = [["skin","Pele",["body"],false],["hair","Cabelo",["hair","beard","mustache"],false],
+  ["shirt","Camisa",["clothes"],true],["pants","Calça",["legs"],true],["shoes","Sapatos",["shoes"],false]];
+const PATTERNS = [["","Cor lisa"],["stripes","Listras horizontais"],["vstripes","Listras verticais"],["diagonal","Diagonal"],
+  ["checker","Xadrez"],["dots","Bolinhas"],["camo","Camuflagem"]];
+$("btnSkin").onclick = () => $("fileSkin").click();
+$("fileSkin").onchange = async () => {
+  const f = $("fileSkin").files[0]; if (!f) return;
+  try {
+    const b64 = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(f); });
+    $("skinThumb").src = b64; $("skinThumb").classList.remove("hidden");
+    const r = await api("/api/skin/colors", {png: b64});
+    $("skinRows").innerHTML = SKIN_ROWS.map(([k, lab, , pat]) => `<div class="slot"><span class="lab">${lab}</span>
+      <span class="sub"><input type="color" id="sk_${k}" value="${r.suggest[k]}">${pat ? `<select id="skp_${k}">${PATTERNS.map(p => `<option value="${p[0]}">${p[1]}</option>`).join("")}</select>
+      <input type="color" id="sk2_${k}" value="${r.secondary[k]}" title="Segunda cor da estampa">` : ""}</span><span></span></div>`).join("") +
+      `<p class="muted">Cores da imagem: ${r.palette.map(p => `<span class="sw" title="${p.hex} (${p.pct}%)" style="background:${p.hex}"></span>`).join(" ")}</p>`;
+    $("skinBox").classList.remove("hidden"); $("skinMsg").textContent = "";
+  } catch (e) { $("skinMsg").textContent = e.message; $("skinBox").classList.remove("hidden"); }
+  $("fileSkin").value = "";
+};
+$("btnSkinApply").onclick = () => {
+  const missing = [];
+  for (const [k, lab, types, pat] of SKIN_ROWS) {
+    let hit = false;
+    for (const t of types) {
+      const c = S.sel[t]; if (!c) continue;
+      const it = S.items.find(i => i.id === c.itemId); if (!it || !it.slots.length) continue;
+      hit = true;
+      const own = it.slots.find(sl => !sl.shared && !(it.match_body && t !== "body" && sl.material === "body"));
+      if (!own) continue;
+      const hex = $("sk_" + k).value;
+      if (it.slots.length === 1) c.recolor = hex; else { c.recolor = (typeof c.recolor === "object" && c.recolor) || {}; c.recolor[own.key] = hex; }
+      c.variant = "";
+      if (pat && $("skp_" + k).value) c.pattern = {kind: $("skp_" + k).value, color2: $("sk2_" + k).value, scale: 3}; else delete c.pattern;
+    }
+    if (!hit) missing.push(lab);
+  }
+  $("skinMsg").textContent = missing.length ? "Sem peça para: " + missing.join(", ") + " (escolha uma peça e aplique de novo)." : "Cores aplicadas. Confira na prévia.";
+  buildPicker(); refresh();
 };
 $("btnLoad").onclick = () => $("fileJson").click();
 $("fileJson").onchange = async () => {

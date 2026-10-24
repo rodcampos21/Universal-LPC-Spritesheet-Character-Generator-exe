@@ -15,6 +15,16 @@ prontas para o Godot.
 Também tem **🎲 Sortear** e **Lote de NPCs aleatórios** (ex.: 50 NPCs de uma vez), e **Abrir personagem (.json)** para
 continuar um personagem salvo.
 
+## Skin a partir de uma imagem (experimental)
+
+Sobe uma imagem de personagem (corpo inteiro, de frente, fundo liso/transparente). O app sugere as cores de **pele, cabelo,
+camisa, calça e sapatos**; você ajusta e clica em **Aplicar ao personagem**. As cores livres viram uma paleta de 6 tons
+(sombra → luz) sobre as peças do LPC, então funcionam em todas as animações e direções. Camisa e calça aceitam
+**estampas** (listras, diagonal, xadrez, bolinhas, camuflagem) que mantêm a sombra do LPC.
+Limites: as cores são estimadas por faixas do corpo e erram em personagens estilizados/chibi; a estampa é fixa no
+quadro (não "gruda" no tecido durante o movimento). Qualquer peça também aceita **cor livre** pelo seletor ao lado
+da cor. Não redesenha a roupa nem o rosto da imagem.
+
 ## Analisar quadros (sem tremida)
 
 Função parecida com o *LPC Frames Analyzer*, feita do zero (o `.exe` original não foi usado nem copiado). Ela recorta os

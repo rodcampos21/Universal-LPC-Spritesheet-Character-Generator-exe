@@ -117,6 +117,9 @@ class Catalog:
         return names
 
     def target_colors(self, slot: dict, name: str) -> list[str] | None:
+        if name.startswith("#"):                       # cor livre (ex.: vinda de uma imagem)
+            from .colorramp import ramp
+            return ramp(name)
         for v in slot["palettes"]:
             pal = self.palette(slot["material"], v)
             if name in pal:
