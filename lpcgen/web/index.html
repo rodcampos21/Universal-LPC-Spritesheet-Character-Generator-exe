@@ -64,6 +64,21 @@
     </div>
     <p id="savemsg" class="muted"></p>
 
+    <h3>Versão HD (cel shade) <span class="tag">experimental</span></h3>
+    <p class="muted">Amplia a pixel art com bordas suaves e contorno de tinta. Gera arquivos <code>_hd</code> separados; os originais não mudam.</p>
+    <div class="row">
+      <label><input type="checkbox" id="hdPrev"> Ver prévia HD</label>
+      <label>Escala <select id="hdScale"><option value="2">2×</option><option value="3" selected>3×</option><option value="4">4×</option></select></label>
+      <label>Contorno <select id="hdOutline"><option value="0">nenhum</option><option value="1">fino</option><option value="2" selected>médio</option><option value="3">grosso</option></select></label>
+    </div>
+    <div class="row">
+      <label>Suavizar <input type="range" id="hdSmooth" min="0" max="100" value="60"></label>
+      <label>Cores <input type="range" id="hdSat" min="70" max="160" value="110"></label>
+      <label>Bandas <select id="hdBands"><option value="0" selected>do LPC</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
+      <label><input type="checkbox" id="hdInk" checked> Linhas internas</label>
+    </div>
+    <div class="row"><label><input type="checkbox" id="oHd"> Salvar também a versão HD</label></div>
+
     <h3>Skin a partir de uma imagem <span class="tag">experimental</span></h3>
     <p class="muted">Sobe uma imagem de personagem (corpo inteiro, de frente, fundo liso ou transparente). O app sugere as cores e você aplica no personagem do LPC.
       Funciona melhor com personagens de proporção realista; confira sempre na prévia.</p>

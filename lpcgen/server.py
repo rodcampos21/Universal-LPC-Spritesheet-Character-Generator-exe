@@ -15,7 +15,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import analyze, assets, catalog, skin, export, paths, randomize, render, uninstall
+from . import analyze, assets, catalog, celshade, skin, export, paths, randomize, render, uninstall
 from .constants import ANIM_PT, ANIMS, BODY_PT, BODY_TYPES, CYCLES, DIR_PT, FPS
 from .jobs import JobManager
 
@@ -122,6 +122,29 @@ class App:
         with self.lock:
             return export.save_character(cat, character, root, name, opts)
 
+    def hd_preview(self, b: dict) -> dict:
+        cat = self.cat()
+        ch = b.get("character") or {}
+        anim = str(b.get("anim") or "walk")
+        params = celshade.clean(b.get("params") or {})
+        with self.lock:
+            if anim.startswith("x:"):
+                name = anim[2:]
+                if name not in render.CUSTOM:
+                    raise AppError("Animação desconhecida.")
+                crop, fs = render.render_custom(cat, ch, name), render.CUSTOM[name]["frameSize"]
+            else:
+                if anim not in ANIMS:
+                    raise AppError("Animação desconhecida.")
+                sheet, _w = render.render_sheet(cat, ch, only={anim})
+                row, nrows, nf = ANIMS[anim]
+                crop, fs = sheet.crop((0, row * 64, nf * 64, (row + nrows) * 64)), 64
+            hd = celshade.celshade_sheet(crop, fs, params)
+        buf = io.BytesIO()
+        hd.save(buf, "PNG")
+        return {"png": "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode(),
+                "cell": fs * params["scale"], "scale": params["scale"]}
+
     def analyze_character(self, b: dict) -> dict:
         cat = self.cat()
         root = self.output(b.get("output_dir"))
@@ -170,7 +193,8 @@ class App:
         folder = export.unique_dir(root, f"{prefix}_lote")
         os.makedirs(folder)
         opts = {"per_anim": bool(b.get("per_anim", False)), "gifs": bool(b.get("gifs", False)),
-                "godot": bool(b.get("godot", True)), "flat": True}
+                "godot": bool(b.get("godot", True)), "flat": True,
+                "hd": (b.get("hd_params") or {}) if b.get("hd") else None}
         done = []
         for i in range(n):
             if cancel.is_set():
@@ -329,6 +353,8 @@ def make_handler(app: App, port_getter):
                 return self._json(r)
             if path == "/api/analyze":
                 return self._json(app.analyze_character(b))
+            if path == "/api/hd_preview":
+                return self._json(app.hd_preview(b))
             if path == "/api/skin/colors":
                 from PIL import Image
                 try:

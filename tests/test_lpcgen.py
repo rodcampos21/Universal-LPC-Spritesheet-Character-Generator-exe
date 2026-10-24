@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np                                                  # noqa: E402
 from PIL import Image                                               # noqa: E402
 
-from lpcgen import analyze, assets, colorramp, skin, catalog, export, paths, randomize, render, server, uninstall   # noqa: E402
+from lpcgen import analyze, assets, celshade, colorramp, skin, catalog, export, paths, randomize, render, server, uninstall   # noqa: E402
 
 SRC = ["#000001", "#101010", "#202020", "#303030", "#404040", "#505050"]
 RED = ["#110000", "#330000", "#550000", "#770000", "#990000", "#bb0000"]
@@ -136,6 +136,37 @@ class CoreTests(Base):
         self.assertTrue(os.path.isfile(os.path.join(root, "spritesheets/x/y.png")))
         self.assertFalse(os.path.exists(os.path.join(root, "tests")))
         self.assertTrue(os.path.isfile(os.path.join(root, ".ok")))
+
+
+class CelShadeTests(Base):
+    def test_frame_scales_and_keeps_silhouette(self):
+        im = Image.new("RGBA", (64, 64))
+        im.paste((200, 60, 60, 255), (20, 10, 44, 56))
+        for sc in (2, 3, 4):
+            out = celshade.celshade_frame(im, {"scale": sc})
+            self.assertEqual(out.size, (64 * sc, 64 * sc))
+            bb = out.getchannel("A").getbbox()
+            self.assertTrue(bb and bb[0] > 0 and bb[2] < 64 * sc)           # contorno não foi cortado
+            self.assertGreater(out.getpixel((32 * sc, 32 * sc))[3], 200)
+            self.assertEqual(out.getpixel((2, 2))[3], 0)
+
+    def test_epx_does_not_invent_colors(self):
+        import numpy as np
+        a = np.zeros((6, 6, 4), np.uint8)
+        a[1:5, 1:5] = (10, 20, 30, 255)
+        a[2, 2] = (200, 100, 50, 255)
+        out = celshade.epx(a)
+        self.assertEqual(out.shape, (12, 12, 4))
+        self.assertTrue({tuple(p) for p in out.reshape(-1, 4)} <= {tuple(p) for p in a.reshape(-1, 4)})
+
+    def test_export_hd_files_and_tres_scale(self):
+        ch = {"bodyType": "male", "selections": {"hair": {"itemId": "hair_a", "recolor": "red"}}}
+        r = export.save_character(self.cat, ch, os.path.join(self.tmp, "o"), "h",
+                                  {"hd": {"scale": 2}, "gifs": False, "per_anim": False})
+        hd = Image.open(os.path.join(r["folder"], "h_hd.png"))
+        self.assertEqual(hd.size, (832 * 2, 3456 * 2))
+        t = open(os.path.join(r["folder"], "h_hd.tres"), encoding="utf-8").read()
+        self.assertIn("Rect2(128, 1024, 128, 128)", t)                          # walk (ciclo começa no quadro 1), y = 8*64*2
 
 
 class SkinTests(Base):

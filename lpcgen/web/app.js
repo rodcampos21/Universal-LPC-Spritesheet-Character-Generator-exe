@@ -180,11 +180,28 @@ function refresh(keepShared) {
       $("anim").innerHTML = S.st.anims.map(a => `<option value="${a.id}">${a.name}</option>`).join("") +
         Object.keys(S.custom).map(k => `<option value="x:${k}">Extra: ${k}</option>`).join("");
       $("anim").value = [...$("anim").options].some(o => o.value === cur) ? cur : "walk";
+      requestHd();
       $("warn").textContent = r.warnings.join(" · ");
     } catch (e) { $("warn").textContent = e.message; }
     if (tok === S.tok) $("busy").classList.add("hidden");
   }, 200);
 }
+
+let hdTimer = null, hdTok = 0;
+function requestHd() {
+  clearTimeout(hdTimer);
+  if (!$("hdPrev").checked) { S.hd = null; return; }
+  hdTimer = setTimeout(async () => {
+    const anim = $("anim").value, tok = ++hdTok;
+    try {
+      const r = await api("/api/hd_preview", {character: character(), anim, params: hdParams()});
+      if (tok !== hdTok) return;
+      const img = new Image(); img.onload = () => { S.hd = {anim, img, cell: r.cell}; }; img.src = r.png;
+    } catch (e) { $("warn").textContent = e.message; }
+  }, 250);
+}
+["hdPrev","hdScale","hdOutline","hdSmooth","hdSat","hdBands","hdInk"].forEach(id => { $(id).onchange = requestHd; });
+$("anim").addEventListener("change", requestHd);
 
 function tick(now) {
   const cv = $("cv"), ctx = cv.getContext("2d");
@@ -195,7 +212,17 @@ function tick(now) {
   if (cu && fsz > 64) z = Math.max(1, z - 1);
   if (cv.width !== fsz * z) { cv.width = cv.height = fsz * z; }
   ctx.clearRect(0, 0, cv.width, cv.height);
-  if (cu && cu.img.complete) {
+  const hd = $("hdPrev").checked && S.hd && S.hd.anim === av ? S.hd : null;
+  if (hd) {
+    const a = cu ? null : S.st.anims.find(x => x.id === av);
+    const di = ["up","left","down","right"].indexOf($("dir").value);
+    const nrows = cu ? 4 : a.rows;
+    const row = nrows === 4 ? di : 0;
+    const cyc = cu ? Array.from({length: cu.cols}, (_, i) => i) : a.cycle;
+    const idx = cyc[Math.floor((now - S.t0) / 1000 * (cu ? 10 : a.fps)) % cyc.length];
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(hd.img, idx * hd.cell, row * hd.cell, hd.cell, hd.cell, 0, 0, fsz * z, fsz * z);
+  } else if (cu && cu.img.complete) {
     const di = ["up","left","down","right"].indexOf($("dir").value);
     const idx = Math.floor((now - S.t0) / 1000 * 10) % cu.cols;
     ctx.imageSmoothingEnabled = false;
@@ -262,7 +289,10 @@ async function saveDir() {
 }
 $("outdir").onchange = saveDir;
 $("btnOpen").onclick = () => api("/api/openfolder", {path: $("outdir").value}).catch(e => $("savemsg").textContent = e.message);
-const opts = () => ({per_anim: $("oAnim").checked, gifs: $("oGif").checked, godot: $("oGodot").checked});
+const hdParams = () => ({scale: +$("hdScale").value, outline: +$("hdOutline").value, smooth: +$("hdSmooth").value,
+  saturation: +$("hdSat").value, bands: +$("hdBands").value, ink: $("hdInk").checked});
+const opts = () => ({per_anim: $("oAnim").checked, gifs: $("oGif").checked, godot: $("oGodot").checked,
+  hd: $("oHd").checked ? hdParams() : null});
 $("btnSave").onclick = async () => {
   $("savemsg").textContent = "Salvando…";
   if (!(await saveDir())) return;
@@ -275,7 +305,7 @@ $("btnBatch").onclick = async () => {
   if (!(await saveDir())) return;
   $("bmsg").textContent = "";
   try {
-    const r = await api("/api/batch", {count: +$("bcount").value, prefix: $("bprefix").value, output_dir: $("outdir").value, ...opts()});
+    const r = await api("/api/batch", {count: +$("bcount").value, prefix: $("bprefix").value, output_dir: $("outdir").value, ...opts(), hd: $("oHd").checked, hd_params: hdParams()});
     await pollJob(r.job, $("bbar"), $("bmsg"), (res) => { $("bmsg").textContent = `${res.count} personagens salvos em: ${res.folder}`; });
   } catch (e) { $("bmsg").textContent = "Erro: " + e.message; }
 };

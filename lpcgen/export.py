@@ -11,6 +11,7 @@ from PIL import Image
 
 from .catalog import Catalog
 from .constants import ANIMS, CYCLES, DIRECTIONS, FPS, FRAME
+from . import celshade
 from .render import CUSTOM, custom_names, render_custom, render_sheet, resolve
 
 
@@ -124,13 +125,14 @@ def godot_res_path(png_path: str) -> str:
     return "res://" + os.path.basename(png_path)
 
 
-def spriteframes_tres(sheet_res: str, anims: list[str], customs=()) -> str:
+def spriteframes_tres(sheet_res: str, anims: list[str], customs=(), scale: int = 1) -> str:
     """customs: [(nome, caminho res://, tamanho do quadro, colunas)]"""
     subs, blocks = [], []
     n = 0
     ext = ['[ext_resource type="Texture2D" path="%s" id="1"]' % sheet_res]
     for k, (cname, cres, cfs, ccols) in enumerate(customs, start=2):
         ext.append('[ext_resource type="Texture2D" path="%s" id="%d"]' % (cres, k))
+        cfs *= scale
         for di, d in enumerate(DIRECTIONS):
             fr = []
             for idx in range(ccols):
@@ -147,9 +149,9 @@ def spriteframes_tres(sheet_res: str, anims: list[str], customs=()) -> str:
             fr = []
             for idx in CYCLES[name]:
                 n += 1
-                y = (row + (DIRECTIONS.index(d) if d else 0)) * FRAME
+                y = (row + (DIRECTIONS.index(d) if d else 0)) * FRAME * scale
                 subs.append(f'[sub_resource type="AtlasTexture" id="AtlasTexture_{n}"]\n'
-                            f'atlas = ExtResource("1")\nregion = Rect2({idx * FRAME}, {y}, {FRAME}, {FRAME})\n')
+                            f'atlas = ExtResource("1")\nregion = Rect2({idx * FRAME * scale}, {y}, {FRAME * scale}, {FRAME * scale})\n')
                 fr.append('{\n"duration": 1.0,\n"texture": SubResource("AtlasTexture_%d")\n}' % n)
             loop = "false" if name in ("hurt", "slash", "thrust", "spellcast", "shoot", "backslash", "halfslash") else "true"
             nm = f"{name}_{d}" if d else name
@@ -162,7 +164,7 @@ def spriteframes_tres(sheet_res: str, anims: list[str], customs=()) -> str:
 
 def save_character(cat: Catalog, character: dict, out_root: str, name: str, opts: dict | None = None) -> dict:
     """Salva tudo em <out_root>/<nome>/ . Retorna caminhos."""
-    opts = {"per_anim": True, "gifs": True, "godot": True, "flat": False, **(opts or {})}
+    opts = {"per_anim": True, "gifs": True, "godot": True, "flat": False, "hd": None, **(opts or {})}
     sheet, warns = render_sheet(cat, character)
     base = slug(name)
     folder = out_root if opts["flat"] else unique_dir(out_root, base)
@@ -204,6 +206,23 @@ def save_character(cat: Catalog, character: dict, out_root: str, name: str, opts
                 with open(p, "wb") as fh:
                     fh.write(gif_bytes(sheet, a))
                 files.append(p)
+    if opts["hd"]:                                   # versão HD cel shade (experimental)
+        hp = celshade.clean(opts["hd"] if isinstance(opts["hd"], dict) else {})
+        sc = hp["scale"]
+        hd_png = os.path.join(folder, f"{stem}_hd.png")
+        celshade.celshade_sheet(sheet, FRAME, hp).save(hd_png)
+        files.append(hd_png)
+        hd_customs = []
+        for c in customs:
+            cp_hd = os.path.join(folder, f"{stem}_{c[0]}_hd.png")
+            celshade.celshade_sheet(c[4], c[2], hp).save(cp_hd)
+            files.append(cp_hd)
+            hd_customs.append((c[0], godot_res_path(cp_hd), c[2], c[3]))
+        if opts["godot"]:
+            tp = os.path.join(folder, stem + "_hd.tres")
+            with open(tp, "w", encoding="utf-8") as fh:
+                fh.write(spriteframes_tres(godot_res_path(hd_png), anims, hd_customs, sc))
+            files.append(tp)
     if opts["gifs"]:
         d = os.path.join(folder, "previas", stem) if opts["flat"] else os.path.join(folder, "previas")
         os.makedirs(d, exist_ok=True)

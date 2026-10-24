@@ -15,6 +15,14 @@ prontas para o Godot.
 Também tem **🎲 Sortear** e **Lote de NPCs aleatórios** (ex.: 50 NPCs de uma vez), e **Abrir personagem (.json)** para
 continuar um personagem salvo.
 
+## Versão HD "cel shade" (experimental)
+
+Amplia a pixel art (2×, 3× ou 4×) com bordas suaves e redondas, **contorno de tinta**, linhas internas, cores um pouco
+mais vivas e, se quiser, menos bandas de sombra. É um efeito automático, sem IA: usa o algoritmo Scale2x/EPX (não inventa
+cores), suavização e contorno. Marque **Ver prévia HD** para ver animado e **Salvar também a versão HD** para gerar
+`<nome>_hd.png`, as folhas extras `_hd` e o `<nome>_hd.tres` (com os quadros já na escala certa). Os arquivos originais
+não mudam. Em quadros muito pequenos o contorno pode "engolir" detalhes finos (olhos); ajuste Suavizar/Contorno.
+
 ## Skin a partir de uma imagem (experimental)
 
 Sobe uma imagem de personagem (corpo inteiro, de frente, fundo liso/transparente). O app sugere as cores de **pele, cabelo,
