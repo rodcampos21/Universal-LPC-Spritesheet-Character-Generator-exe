@@ -103,6 +103,12 @@ class CoreTests(Base):
         self.assertNotEqual(r["folder"], r2["folder"])
         self.assertEqual(Image.open(r["sheet"]).size, (832, 3456))
 
+    def test_tres_includes_custom_sheets(self):
+        t = export.spriteframes_tres("res://a.png", ["walk"], [("slash_oversize", "res://a_s.png", 192, 6)])
+        self.assertIn('id="2"', t)
+        self.assertIn("slash_oversize_down", t)
+        self.assertIn("Rect2(960, 384, 192, 192)", t)
+
     def test_godot_res_path_finds_project(self):
         proj = os.path.join(self.tmp, "jogo")
         os.makedirs(os.path.join(proj, "sprites"))

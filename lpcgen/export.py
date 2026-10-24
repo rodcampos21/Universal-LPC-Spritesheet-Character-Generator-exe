@@ -11,7 +11,7 @@ from PIL import Image
 
 from .catalog import Catalog
 from .constants import ANIMS, CYCLES, DIRECTIONS, FPS, FRAME
-from .render import render_sheet, resolve
+from .render import CUSTOM, custom_names, render_custom, render_sheet, resolve
 
 
 def slug(name: str) -> str:
@@ -49,22 +49,32 @@ def frame(sheet: Image.Image, name: str, direction: str, idx: int) -> Image.Imag
     return sheet.crop((idx * FRAME, r * FRAME, (idx + 1) * FRAME, (r + 1) * FRAME))
 
 
-def gif_bytes(sheet: Image.Image, name: str, scale: int = 3, directions=None) -> bytes:
-    nrows = ANIMS[name][1]
-    dirs = directions or (DIRECTIONS if nrows == 4 else ["down"])
-    cycle = CYCLES[name]
+def gif_bytes(sheet: Image.Image, name: str, scale: int = 3, directions=None, custom_fs: int = 0) -> bytes:
+    if custom_fs:                                   # animação extra: 4 linhas de quadros grandes
+        dirs = DIRECTIONS
+        cycle = list(range(sheet.width // custom_fs))
+        scale = max(1, scale - 1)
+    else:
+        nrows = ANIMS[name][1]
+        dirs = directions or (DIRECTIONS if nrows == 4 else ["down"])
+        cycle = CYCLES[name]
+    fsz = custom_fs or FRAME
     frames = []
     for idx in cycle:
-        strip = Image.new("RGBA", (FRAME * len(dirs), FRAME), (0, 0, 0, 0))
+        strip = Image.new("RGBA", (fsz * len(dirs), fsz), (0, 0, 0, 0))
         for i, d in enumerate(dirs):
-            strip.alpha_composite(frame(sheet, name, d, idx), (i * FRAME, 0))
+            if custom_fs:
+                fr = sheet.crop((idx * fsz, i * fsz, (idx + 1) * fsz, (i + 1) * fsz))
+            else:
+                fr = frame(sheet, name, d, idx)
+            strip.alpha_composite(fr, (i * fsz, 0))
         strip = strip.resize((strip.width * scale, strip.height * scale), Image.NEAREST)
         bg = Image.new("RGBA", strip.size, (58, 62, 74, 255))
         bg.alpha_composite(strip)
         frames.append(bg.convert("P", palette=Image.ADAPTIVE))
     buf = io.BytesIO()
     frames[0].save(buf, "GIF", save_all=True, append_images=frames[1:], loop=0,
-                   duration=int(1000 / FPS.get(name, 8)), disposal=2)
+                   duration=int(1000 / (10 if custom_fs else FPS.get(name, 8))), disposal=2)
     return buf.getvalue()
 
 
@@ -114,9 +124,22 @@ def godot_res_path(png_path: str) -> str:
     return "res://" + os.path.basename(png_path)
 
 
-def spriteframes_tres(sheet_res: str, anims: list[str]) -> str:
+def spriteframes_tres(sheet_res: str, anims: list[str], customs=()) -> str:
+    """customs: [(nome, caminho res://, tamanho do quadro, colunas)]"""
     subs, blocks = [], []
     n = 0
+    ext = ['[ext_resource type="Texture2D" path="%s" id="1"]' % sheet_res]
+    for k, (cname, cres, cfs, ccols) in enumerate(customs, start=2):
+        ext.append('[ext_resource type="Texture2D" path="%s" id="%d"]' % (cres, k))
+        for di, d in enumerate(DIRECTIONS):
+            fr = []
+            for idx in range(ccols):
+                n += 1
+                subs.append(f'[sub_resource type="AtlasTexture" id="AtlasTexture_{n}"]\n'
+                            f'atlas = ExtResource("{k}")\nregion = Rect2({idx * cfs}, {di * cfs}, {cfs}, {cfs})\n')
+                fr.append('{\n"duration": 1.0,\n"texture": SubResource("AtlasTexture_%d")\n}' % n)
+            blocks.append('{\n"frames": [%s],\n"loop": false,\n"name": &"%s_%s",\n"speed": 10.0\n}'
+                          % (", ".join(fr), cname, d))
     for name in anims:
         row, nrows, _nf = ANIMS[name]
         dirs = DIRECTIONS if nrows == 4 else [None]
@@ -133,8 +156,8 @@ def spriteframes_tres(sheet_res: str, anims: list[str]) -> str:
             blocks.append('{\n"frames": [%s],\n"loop": %s,\n"name": &"%s",\n"speed": %.1f\n}'
                           % (", ".join(fr), loop, nm, float(FPS.get(name, 8))))
     return ('[gd_resource type="SpriteFrames" load_steps=%d format=3]\n\n'
-            '[ext_resource type="Texture2D" path="%s" id="1"]\n\n%s\n[resource]\nanimations = [%s]\n'
-            % (len(subs) + 2, sheet_res, "\n".join(subs), ", ".join(blocks)))
+            '%s\n\n%s\n[resource]\nanimations = [%s]\n'
+            % (len(subs) + 1 + len(ext), "\n".join(ext), "\n".join(subs), ", ".join(blocks)))
 
 
 def save_character(cat: Catalog, character: dict, out_root: str, name: str, opts: dict | None = None) -> dict:
@@ -155,6 +178,16 @@ def save_character(cat: Catalog, character: dict, out_root: str, name: str, opts
     sheet.save(png)
     anims = used_anims(sheet)
     files = [png]
+    customs = []
+    for cname in custom_names(cat, character):
+        csheet = render_custom(cat, character, cname)
+        if not csheet.getbbox():
+            continue
+        cp = os.path.join(folder, f"{stem}_{cname}.png")
+        csheet.save(cp)
+        files.append(cp)
+        fs = CUSTOM[cname]["frameSize"]
+        customs.append((cname, cp, fs, csheet.width // fs, csheet))
     if opts["per_anim"]:
         d = os.path.join(folder, "animacoes", stem) if opts["flat"] else os.path.join(folder, "animacoes")
         os.makedirs(d, exist_ok=True)
@@ -171,6 +204,14 @@ def save_character(cat: Catalog, character: dict, out_root: str, name: str, opts
                 with open(p, "wb") as fh:
                     fh.write(gif_bytes(sheet, a))
                 files.append(p)
+    if opts["gifs"]:
+        d = os.path.join(folder, "previas", stem) if opts["flat"] else os.path.join(folder, "previas")
+        os.makedirs(d, exist_ok=True)
+        for c in customs:
+            p = os.path.join(d, f"{c[0]}.gif")
+            with open(p, "wb") as fh:
+                fh.write(gif_bytes(c[4], c[0], custom_fs=c[2]))
+            files.append(p)
     meta = os.path.join(folder, stem + ".json")
     with open(meta, "w", encoding="utf-8") as fh:
         json.dump({**character, "version": 2}, fh, ensure_ascii=False, indent=1)
@@ -188,6 +229,7 @@ def save_character(cat: Catalog, character: dict, out_root: str, name: str, opts
     if opts["godot"]:
         tp = os.path.join(folder, stem + ".tres")
         with open(tp, "w", encoding="utf-8") as fh:
-            fh.write(spriteframes_tres(godot_res_path(png), anims))
+            fh.write(spriteframes_tres(godot_res_path(png), anims,
+                                       [(c[0], godot_res_path(c[1]), c[2], c[3]) for c in customs]))
         files.append(tp)
-    return {"folder": folder, "sheet": png, "files": files, "warnings": warns, "animations": anims}
+    return {"folder": folder, "sheet": png, "files": files, "warnings": warns, "animations": anims + [c[0] for c in customs]}

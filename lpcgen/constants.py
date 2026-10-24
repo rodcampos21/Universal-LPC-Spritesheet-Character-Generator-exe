@@ -8,9 +8,9 @@ BODY_PT = {"male": "Masculino", "female": "Feminino", "teen": "Adolescente", "ch
            "muscular": "Musculoso", "pregnant": "Grávida"}
 
 # nome na definição -> (pasta/arquivo, exportável)
-ANIM_FOLDER = {"combat": "combat_idle", "1h_slash": "backslash", "1h_backslash": "backslash",
+ANIM_FOLDER = {"watering": "thrust", "combat": "combat_idle", "1h_slash": "backslash", "1h_backslash": "backslash",
                "1h_halfslash": "halfslash"}
-NO_EXPORT = {"watering", "1h_slash"}
+NO_EXPORT = set()
 DEFAULT_ANIMS = ["spellcast", "thrust", "walk", "slash", "shoot", "hurt", "watering"]
 
 # pasta -> (y em linhas, linhas, quadros por linha)

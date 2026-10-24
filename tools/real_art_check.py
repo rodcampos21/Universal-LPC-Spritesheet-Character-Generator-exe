@@ -31,4 +31,12 @@ for body in ("male", "female", "teen", "child", "muscular", "pregnant"):
         from PIL import Image
         assert Image.open(r["sheet"]).getbbox(), (body, seed)
         assert "walk" in r["animations"], (body, seed, r["animations"])
+# armas com golpe grande (camadas "oversize") precisam sair numa folha extra
+ch = randomize.random_character(cat, seed=1, body="male")
+ch["selections"]["weapon"] = {"itemId": "weapon_blunt_mace", "variant": "mace"}
+r = export.save_character(cat, ch, out, "maca", {"gifs": True})
+assert "slash_oversize" in r["animations"], r["animations"]
+extra = [f for f in r["files"] if f.endswith("maca_slash_oversize.png")]
+assert extra and Image.open(extra[0]).getbbox() and Image.open(extra[0]).size == (1152, 768)
+assert "slash_oversize_down" in open(os.path.join(r["folder"], "maca.tres"), encoding="utf-8").read()
 print("ok")

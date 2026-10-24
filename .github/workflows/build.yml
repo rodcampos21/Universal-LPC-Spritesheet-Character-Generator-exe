@@ -42,6 +42,7 @@ jobs:
           --name LPCSpriteGerador
           --paths .
           --add-data "lpcgen/web;lpcgen/web"
+          --add-data "lpcgen/custom_anims.json;lpcgen"
           lpcgen/launch.py
 
       - name: Teste do .exe

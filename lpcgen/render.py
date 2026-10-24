@@ -1,8 +1,10 @@
 """Compositor: junta as camadas (por zPos) de uma seleção em uma folha LPC de 832x3456."""
 from __future__ import annotations
 
+import json
 import os
 import re
+import sys
 
 import numpy as np
 from PIL import Image
@@ -11,6 +13,10 @@ from .catalog import Catalog, Item
 from .constants import (ANIM_FOLDER, ANIMS, DEFAULT_ANIMS, FRAME, NO_EXPORT, SHEET_H, SHEET_W)
 
 _cache: dict[str, np.ndarray] = {}
+_HERE = os.path.join(sys._MEIPASS, "lpcgen") if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(_HERE, "custom_anims.json"), encoding="utf-8") as _fh:
+    CUSTOM: dict = json.load(_fh)
+_DIRN = {"n": 0, "w": 1, "s": 2, "e": 3}
 
 
 def _hex(c: str) -> tuple[int, int, int]:
@@ -178,3 +184,68 @@ def render_sheet(cat: Catalog, character: dict, only: set[str] | None = None) ->
         im = Image.fromarray(recolor(arr, mapping))
         canvas.alpha_composite(im, (0, ANIMS[folder][0] * FRAME))
     return canvas, warns
+
+
+def custom_names(cat: Catalog, character: dict) -> list[str]:
+    """Animações extras (golpes grandes de arma, ferramentas…) usadas pelas peças escolhidas."""
+    body = character.get("bodyType", "male")
+    pairs, _ = resolve(cat, character)
+    out: list[str] = []
+    for it, _s in pairs:
+        for lay in it.layers:
+            c = lay["custom"]
+            if c and c in CUSTOM and body in lay["paths"] and c not in out:
+                out.append(c)
+    return out
+
+
+def _frame_blit(canvas: Image.Image, src: Image.Image, spec: str, i: int, j: int, fs: int, single_size=None):
+    row_name, col = spec.split(",")
+    d = _DIRN.get(row_name.split("-")[1], 0)
+    sf = single_size or FRAME
+    box = (int(col) * sf, d * sf, int(col) * sf + sf, d * sf + sf)
+    if box[2] > src.width or box[3] > src.height:
+        return
+    fr = src.crop(box)
+    off = (fs - sf) // 2
+    canvas.alpha_composite(fr, (j * fs + off, i * fs + off))
+
+
+def render_custom(cat: Catalog, character: dict, name: str) -> Image.Image:
+    """Folha de uma animação extra: camadas próprias da arma + quadros do corpo/roupas recortados."""
+    body = character.get("bodyType", "male")
+    d = CUSTOM[name]
+    fs, frames = d["frameSize"], d["frames"]
+    cols = max(len(r) for r in frames)
+    canvas = Image.new("RGBA", (cols * fs, len(frames) * fs), (0, 0, 0, 0))
+    base = frames[0][0].split(",")[0].split("-")[0]
+    pairs, _ = resolve(cat, character)
+    body_sel = body_selection(character.get("selections") or {})
+    shared = character.get("shared") or {}
+    items = []                                                   # (z, order, kind, path, mapping)
+    n = 0
+    for it, s in pairs:
+        mapping = color_mapping(cat, it, s, body_sel, shared)
+        variant = "" if it.recolors else (s.get("variant") or (it.variants[0] if it.variants else "")).replace(" ", "_")
+        for lay in it.layers:
+            if lay["custom"] == name and body in lay["paths"]:
+                p = os.path.join(cat.root, "spritesheets", lay["paths"][body] + variant + ".png")
+                items.append((lay["zPos"], n, "custom", p, mapping)); n += 1
+    calls, _w = draw_calls(cat, character)
+    for z, o, folder, p, mapping in calls:
+        if folder == base:
+            items.append((z, 1000 + o, "extract", p, mapping))
+    items.sort(key=lambda t: (t[0], t[1]))
+    for _z, _o, kind, p, mapping in items:
+        arr = _load(p)
+        if arr is None:
+            continue
+        im = Image.fromarray(recolor(arr, mapping))
+        if kind == "custom" and not d["single"]:
+            canvas.alpha_composite(im, (0, 0))
+            continue
+        single = im.height // 4 if kind == "custom" else None
+        for i, row in enumerate(frames):
+            for j, spec in enumerate(row):
+                _frame_blit(canvas, im, spec, i, j, fs, single)
+    return canvas

@@ -167,6 +167,12 @@ function refresh(keepShared) {
       const img = new Image();
       img.onload = () => { S.img = img; S.t0 = performance.now(); };
       img.src = r.png;
+      S.custom = {};
+      for (const [k, v] of Object.entries(r.custom || {})) { const ci = new Image(); ci.src = v.png; S.custom[k] = {img: ci, fs: v.frameSize, cols: v.cols}; }
+      const cur = $("anim").value;
+      $("anim").innerHTML = S.st.anims.map(a => `<option value="${a.id}">${a.name}</option>`).join("") +
+        Object.keys(S.custom).map(k => `<option value="x:${k}">Extra: ${k}</option>`).join("");
+      $("anim").value = [...$("anim").options].some(o => o.value === cur) ? cur : "walk";
       $("warn").textContent = r.warnings.join(" · ");
     } catch (e) { $("warn").textContent = e.message; }
     if (tok === S.tok) $("busy").classList.add("hidden");
@@ -175,11 +181,20 @@ function refresh(keepShared) {
 
 function tick(now) {
   const cv = $("cv"), ctx = cv.getContext("2d");
-  const z = +$("zoom").value;
-  if (cv.width !== 64 * z) { cv.width = cv.height = 64 * z; }
+  let z = +$("zoom").value;
+  const av = $("anim").value;
+  const cu = av.startsWith("x:") ? S.custom && S.custom[av.slice(2)] : null;
+  const fsz = cu ? cu.fs : 64;
+  if (cu && fsz > 64) z = Math.max(1, z - 1);
+  if (cv.width !== fsz * z) { cv.width = cv.height = fsz * z; }
   ctx.clearRect(0, 0, cv.width, cv.height);
-  if (S.img) {
-    const a = S.st.anims.find(x => x.id === $("anim").value);
+  if (cu && cu.img.complete) {
+    const di = ["up","left","down","right"].indexOf($("dir").value);
+    const idx = Math.floor((now - S.t0) / 1000 * 10) % cu.cols;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(cu.img, idx * fsz, di * fsz, fsz, fsz, 0, 0, fsz * z, fsz * z);
+  } else if (S.img && !cu) {
+    const a = S.st.anims.find(x => x.id === av);
     const di = ["up","left","down","right"].indexOf($("dir").value);
     const row = a.row + (a.rows === 4 ? di : 0);
     const idx = a.cycle[Math.floor((now - S.t0) / 1000 * a.fps) % a.cycle.length];

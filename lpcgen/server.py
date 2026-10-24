@@ -71,8 +71,19 @@ class App:
             sheet, warns = render.render_sheet(cat, character)
         buf = io.BytesIO()
         sheet.save(buf, "PNG")
+        customs = {}
+        with self.lock:
+            for name in render.custom_names(cat, character):
+                cs = render.render_custom(cat, character, name)
+                if not cs.getbbox():
+                    continue
+                cb = io.BytesIO()
+                cs.save(cb, "PNG")
+                fs = render.CUSTOM[name]["frameSize"]
+                customs[name] = {"png": "data:image/png;base64," + base64.b64encode(cb.getvalue()).decode(),
+                                 "frameSize": fs, "cols": cs.width // fs}
         return {"png": "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode(),
-                "warnings": warns, "animations": export.used_anims(sheet)}
+                "warnings": warns, "animations": export.used_anims(sheet), "custom": customs}
 
     def save(self, character, name, opts, out=None) -> dict:
         cat = self.cat()

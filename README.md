@@ -22,6 +22,7 @@ continuar um personagem salvo.
 | `<nome>.png` | Folha completa 832×3456 (quadros de 64×64, mesmo layout do gerador original) |
 | `animacoes/*.png` | Uma PNG por animação (andar, correr, golpe, parado…) |
 | `previas/*.gif` | GIFs com as 4 direções (para conferir) |
+| `<nome>_slash_oversize.png` etc. | Folhas extras das armas/ferramentas com golpes grandes (quadros de 128/192 px) |
 | `<nome>.tres` | `SpriteFrames` do Godot 4 (`walk_down`, `idle_left`…); se a pasta estiver dentro de um projeto (`project.godot`) o caminho `res://` é calculado sozinho |
 | `<nome>.json` | O personagem (abra de novo no app) |
 | `CREDITOS.csv` / `CREDITOS.txt` | Autores e licenças das peças usadas |
@@ -37,8 +38,8 @@ com lojas como a Steam/mobile). A arte não vem dentro do `.exe`: ela é baixada
 
 ## Limitações da versão 0.1
 
-- Peças com camadas "oversize" (golpes grandes de armas longas) ainda **não** são desenhadas; a arma aparece nas
-  animações normais.
+- Armas com golpe grande (espada, maça, cajado…) usam a animação **extra** (ex.: `slash_oversize`, quadros de 192 px),
+  salva como `<nome>_slash_oversize.png`; nas animações normais (64 px) o gerador original também não desenha essas armas.
 - Só as peças e animações padrão do gerador (não faz o modo de sprites customizados/importados).
 - Windows: usa o Edge/Chrome para abrir a janela do app (o Edge já vem no Windows).
 
