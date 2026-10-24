@@ -149,6 +149,17 @@ class App:
         return analyze.export_analysis(anims, root, str(b.get("name") or "animacao"), mode, bool(b.get("loose")),
                                        "png")
 
+    def analyze_dir(self, b: dict) -> dict:
+        src = str(b.get("dir") or "").strip()
+        if not os.path.isdir(src):
+            raise AppError("Escolha uma pasta que exista.")
+        root = self.output(b.get("output_dir"))
+        mode = "fixed" if b.get("mode") == "fixed" else "compact"
+        try:
+            return analyze.analyze_folder(src, root, mode, bool(b.get("loose")), int(b.get("frame_size") or 0))
+        except ValueError as e:
+            raise AppError(str(e)) from e
+
     def batch(self, b: dict, progress, cancel) -> dict:
         cat = self.cat()
         root = self.output(b.get("output_dir"))
@@ -318,6 +329,8 @@ def make_handler(app: App, port_getter):
                 return self._json(r)
             if path == "/api/analyze":
                 return self._json(app.analyze_character(b))
+            if path == "/api/analyze_dir":
+                return self._json(app.analyze_dir(b))
             if path == "/api/analyze_png":
                 return self._json(app.analyze_png(b))
             if path == "/api/batch":

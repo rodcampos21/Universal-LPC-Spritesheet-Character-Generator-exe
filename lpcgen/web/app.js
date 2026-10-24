@@ -284,6 +284,17 @@ $("btnAnalyze").onclick = async () => {
   try { showReport(await api("/api/analyze", {character: character(), name: $("name").value, ...aopts()})); }
   catch (e) { $("areport").textContent = "Erro: " + e.message; }
 };
+$("btnAnalyzeDir").onclick = async () => {
+  try {
+    const r = await api("/api/pickfolder", {initial: $("outdir").value, title: "Pasta com os PNG para analisar"});
+    if (!r.path) return;
+    $("areport").textContent = "Analisando a pasta…";
+    if (!(await saveDir())) return;
+    const res = await api("/api/analyze_dir", {dir: r.path, ...aopts(), frame_size: +$("afs").value});
+    $("areport").innerHTML = `<p>${res.results.length} arquivo(s) analisado(s) em: ${res.folder}</p>` +
+      (res.errors.length ? `<p class="warn">${res.errors.join("<br>")}</p>` : "");
+  } catch (e) { $("areport").textContent = "Erro: " + e.message; }
+};
 $("btnAnalyzePng").onclick = () => $("filePng").click();
 $("filePng").onchange = async () => {
   const f = $("filePng").files[0]; if (!f) return;

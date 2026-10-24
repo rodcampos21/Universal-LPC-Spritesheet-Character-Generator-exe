@@ -27,6 +27,23 @@ quadros **sem perder a posição**, para a animação não tremer quando o taman
 - Salva em `<nome>_frames/`: um PNG por animação, `<nome>_analise.json` (caixas e deslocamentos de cada quadro),
   `<nome>_frames.tres` e, se marcado, os quadros soltos.
 
+## Analisar quadros (sem tremida)
+
+Inspirado no [LPC Frames Analyzer](https://github.com/matheoheo/LPCFramesAnalyzer) (MIT), de matheoheo; o código aqui
+é próprio. Ele recorta os quadros **sem perder a posição**, inclusive os de arma grande (oversize), para a animação não
+tremer quando o tamanho do quadro muda (como nos golpes de espada):
+
+- **Compacto (recomendado):** cada quadro é recortado no menor retângulo e empacotado; o `.tres` usa a `margin` do
+  `AtlasTexture`, então o Godot devolve cada quadro ao tamanho e posição originais, sem ajuste no jogo.
+- **Caixa fixa:** todos os quadros viram a mesma caixa, centrada no centro original.
+- Para o **personagem atual** o app já conhece cada quadro (não precisa "adivinhar" por varredura). Também analisa
+  **um PNG** ou **uma pasta de PNGs** (folha padrão 832×3456, folha com área extra empilhada embaixo, ou uma animação de
+  64/128/192 px).
+- Salva em `<nome>_frames/`: um PNG por animação, `<nome>_frames.tres` (Godot), `<nome>_analise.json` (completo) e
+  `<nome>_lpcanalyzer.json` no formato do LPC Frames Analyzer (`animations[] → name, dir, frames[] → rect, offset`;
+  o `offset` é a posição do recorte em relação ao canto da célula padrão 64×64, então o personagem fica ancorado).
+- Não gera o formato `.matt`.
+
 ## O que é salvo (em `<pasta escolhida>/<nome>/`)
 
 | Arquivo | Para quê |

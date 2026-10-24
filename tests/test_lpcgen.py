@@ -188,6 +188,30 @@ class AnalyzeTests(Base):
         cell.paste(sheet.crop((0, 0, w, h)), (32 - half[0], 32 - half[1]))
         self.assertEqual(cell.tobytes(), a.frames[0][0].tobytes())
 
+    def test_compat_json_and_offsets(self):
+        anims = self._anims()
+        r = analyze.export_analysis(anims, self.tmp, "c", "compact")
+        d = json.load(open(os.path.join(r["folder"], "c_lpcanalyzer.json")))
+        e = [a for a in d["animations"] if a["name"] == "slash_oversize" and a["dir"] == "down"][0]
+        f0 = e["frames"][0]
+        self.assertEqual(set(f0), {"rect", "offset"})
+        b = anims[0].frames[2][0].getchannel("A").getbbox()
+        self.assertEqual((f0["offset"]["x"], f0["offset"]["y"]), (b[0] - 64, b[1] - 64))   # âncora (192-64)/2
+
+    def test_full_sheet_with_extra_area_and_folder(self):
+        sheet = Image.new("RGBA", (832, 3456 + 768))
+        sheet.paste((255, 0, 0, 255), (10, 8 * 64 + 10, 40, 8 * 64 + 40))
+        sheet.paste((0, 255, 0, 255), (100, 3456 + 100, 140, 3456 + 140))
+        an = analyze.from_png(sheet)
+        self.assertEqual([a.name for a in an], ["walk", "extra1_192px"])
+        d = os.path.join(self.tmp, "pngs")
+        os.makedirs(d)
+        sheet.save(os.path.join(d, "a.png"))
+        Image.new("RGBA", (100, 100)).save(os.path.join(d, "ruim.png"))
+        r = analyze.analyze_folder(d, os.path.join(self.tmp, "o"))
+        self.assertEqual(len(r["results"]), 1)
+        self.assertEqual(len(r["errors"]), 1)
+
     def test_from_png_detects_oversize(self):
         im = Image.new("RGBA", (192 * 6, 768))
         im.paste((255, 0, 0, 255), (90, 90, 100, 100))

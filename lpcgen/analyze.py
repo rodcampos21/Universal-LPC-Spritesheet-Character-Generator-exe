@@ -61,10 +61,37 @@ def from_custom_sheet(name: str, img: Image.Image, fs: int) -> AnimData:
     return AnimData(name, fs, dirs, frames, list(range(cols)))
 
 
+def _split_extra(h: int, img: Image.Image) -> list[int] | None:
+    """Folha do gerador com áreas extras empilhadas abaixo dos 3456 px: descobre o tamanho de cada bloco."""
+    sizes = (192, 128, 64)
+
+    def walk(y, acc):
+        if y == img.height:
+            return acc
+        for fs in sizes:
+            if y + 4 * fs <= img.height:
+                if not img.crop((0, y, img.width, y + 4 * fs)).getbbox():
+                    continue
+                r = walk(y + 4 * fs, acc + [fs])
+                if r:
+                    return r
+        return None
+    return walk(3456, [])
+
+
 def from_png(img: Image.Image, frame_size: int = 0, name: str = "animacao") -> list[AnimData]:
     img = img.convert("RGBA")
-    if img.size == (832, 3456):
-        return from_standard_sheet(img)
+    if img.width == 832 and img.height >= 3456:
+        anims = from_standard_sheet(img.crop((0, 0, 832, 3456)))
+        if img.height > 3456:
+            blocks = _split_extra(img.height, img)
+            if blocks is None:
+                raise ValueError("Não consegui separar a área extra (animações grandes) dessa folha.")
+            y = 3456
+            for i, fs in enumerate(blocks, start=1):
+                anims.append(from_custom_sheet(f"extra{i}_{fs}px", img.crop((0, y, img.width, y + 4 * fs)), fs))
+                y += 4 * fs
+        return anims
     fs = frame_size or (img.height // 4 if img.height // 4 in (64, 128, 192) and img.height % 4 == 0 else FRAME)
     if img.width % fs or img.height % fs:
         raise ValueError(f"O tamanho {img.width}×{img.height} não é múltiplo de {fs}. Informe o tamanho do quadro.")
@@ -103,6 +130,7 @@ def _pack(a: AnimData, meas: dict, mode: str, half) -> tuple[Image.Image, dict]:
     sheet = Image.new("RGBA", (cols * cw, rows * ch), (0, 0, 0, 0))
     data = {}
     c0 = a.fs / 2
+    anchor = (a.fs - FRAME) // 2          # canto da célula padrão 64×64 dentro do quadro
     for r, row in enumerate(a.frames):
         data[a.dirs[r]] = []
         for c, fr in enumerate(row):
@@ -112,15 +140,18 @@ def _pack(a: AnimData, meas: dict, mode: str, half) -> tuple[Image.Image, dict]:
                 piece = Image.new("RGBA", (cw, ch))
                 piece.paste(fr, (-x0, -y0))
                 sheet.paste(piece, (c * cw, r * ch))
-                data[a.dirs[r]].append({"bbox": list(b) if b else None, "region": [c * cw, r * ch, cw, ch]})
+                data[a.dirs[r]].append({"bbox": list(b) if b else None, "region": [c * cw, r * ch, cw, ch],
+                                        "offset": [x0 - anchor, y0 - anchor]})
             else:
                 if b is None:
-                    data[a.dirs[r]].append({"bbox": None, "region": [c * cw, r * ch, 1, 1], "margin": [0, 0, a.fs - 1, a.fs - 1]})
+                    data[a.dirs[r]].append({"bbox": None, "region": [c * cw, r * ch, 1, 1],
+                                            "margin": [0, 0, a.fs - 1, a.fs - 1], "offset": [0, 0]})
                     continue
                 w, h = b[2] - b[0], b[3] - b[1]
                 sheet.paste(fr.crop(b), (c * cw, r * ch))
                 data[a.dirs[r]].append({"bbox": list(b), "region": [c * cw, r * ch, w, h],
-                                        "margin": [b[0], b[1], a.fs - w, a.fs - h]})
+                                        "margin": [b[0], b[1], a.fs - w, a.fs - h],
+                                        "offset": [b[0] - anchor, b[1] - anchor]})
     return sheet, data
 
 
@@ -189,6 +220,16 @@ def export_analysis(anims: list[AnimData], out_root: str, name: str, mode: str =
     with open(os.path.join(folder, f"{base}_analise.json"), "w", encoding="utf-8") as fh:
         json.dump({"mode": mode, "source": source, "global_half_box": list(meas["half"]), "animations": jdata},
                   fh, ensure_ascii=False, indent=1)
+    compat = []
+    for a in anims:
+        for d in a.dirs:
+            compat.append({"name": a.name, "dir": d, "image": os.path.basename(jdata[a.name]["file"]),
+                           "frame_time_ms": int(1000 / FPS.get(a.name, 10 if a.name in CUSTOM else 8)),
+                           "frames": [{"rect": dict(zip("xywh", f["region"])),
+                                       "offset": {"x": f["offset"][0], "y": f["offset"][1]}}
+                                      for f in packed[a.name][d]]})
+    with open(os.path.join(folder, f"{base}_lpcanalyzer.json"), "w", encoding="utf-8") as fh:
+        json.dump({"animations": compat}, fh, ensure_ascii=False, indent=1)
     with open(os.path.join(folder, f"{base}_frames.tres"), "w", encoding="utf-8") as fh:
         fh.write(tres(paths_res, anims, packed, mode))
     return {"folder": folder, "report": report, "mode": mode}
@@ -202,3 +243,24 @@ def analyze_character(cat, character: dict, out_root: str, name: str, mode="comp
         if cs.getbbox():
             anims.append(from_custom_sheet(cname, cs, CUSTOM[cname]["frameSize"]))
     return export_analysis(anims, out_root, name, mode, loose, "personagem")
+
+
+def analyze_folder(src_dir: str, out_root: str, mode="compact", loose=False, frame_size=0) -> dict:
+    """Analisa todos os PNG de uma pasta (não recursivo)."""
+    pngs = sorted(f for f in os.listdir(src_dir) if f.lower().endswith(".png"))
+    if not pngs:
+        raise ValueError("Não há PNG nessa pasta.")
+    results, errors = [], []
+    for f in pngs:
+        try:
+            im = Image.open(os.path.join(src_dir, f))
+            im.load()
+            anims = from_png(im, frame_size, slug(os.path.splitext(f)[0]))
+            if not anims:
+                errors.append(f"{f}: sem quadros desenhados")
+                continue
+            r = export_analysis(anims, out_root, os.path.splitext(f)[0], mode, loose, f)
+            results.append({"file": f, "folder": r["folder"], "animations": len(anims)})
+        except (ValueError, OSError) as e:
+            errors.append(f"{f}: {e}")
+    return {"results": results, "errors": errors, "folder": out_root}
